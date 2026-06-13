@@ -96,6 +96,27 @@ describe('SidecarHttpApi', () => {
         })
       );
     });
+
+    it('sendMessage 调用正确的端点和参数', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      const api = createApi('test-token');
+      await api.sendMessage('ses-001', 'Hello AI');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:32101/api/session/send',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ sessionId: 'ses-001', message: 'Hello AI' }),
+          headers: expect.objectContaining({
+            Authorization: 'Bearer test-token',
+          }),
+        })
+      );
+    });
   });
 
   // ========== 错误处理 ==========

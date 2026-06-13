@@ -171,7 +171,7 @@ export class SseClient {
 
     // react-native-sse 的 EventSource 构造函数
     const EventSource = require('react-native-sse').default;
-    this.eventSource = new EventSource(this.eventSource || this.options.url, {
+    this.eventSource = new EventSource(this.options.url, {
       headers,
     });
 

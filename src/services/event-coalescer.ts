@@ -57,7 +57,9 @@ export class EventCoalescer {
       const mergedText = events
         .map(e => {
           if (typeof e.data === 'string') return e.data;
-          if (e.data && typeof e.data.text === 'string') return e.data.text;
+          if (e.data && typeof e.data === 'object' && 'text' in e.data) {
+            return String(e.data.text ?? '');
+          }
           return '';
         })
         .join('');
