@@ -11,4 +11,5 @@ declare module 'react-native' {
   export const Alert: any;
   export const TextInput: any;
   export const ActivityIndicator: any;
+  export const KeyboardAvoidingView: any;
 }

@@ -10,6 +10,7 @@ module.exports = {
   testMatch: [
     '<rootDir>/src/**/__tests__/**/*.test.(ts|tsx)',
     '<rootDir>/src/**/*.test.(ts|tsx)',
+    '<rootDir>/poc/app/src/**/__tests__/**/*.test.(ts|tsx)',
   ],
   collectCoverageFrom: [
     'src/services/**/*.ts',
