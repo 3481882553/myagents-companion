@@ -125,14 +125,12 @@ function BashToolItem({ result }: { result: BashResult }) {
         <View testID="bash-output" style={styles.outputContainer}>
           <ScrollView
             testID="bash-output-scroll"
+            horizontal
             style={styles.outputScroll}
-            nestedScrollEnabled={true}
           >
-            <ScrollView horizontal nestedScrollEnabled={true}>
-              <Text style={[styles.output, isError && styles.outputError]} selectable>
-                {result.output}
-              </Text>
-            </ScrollView>
+            <Text style={[styles.output, isError && styles.outputError]} selectable>
+              {result.output}
+            </Text>
           </ScrollView>
         </View>
       )}
@@ -241,7 +239,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   outputScroll: {
-    maxHeight: 500,
+    maxHeight: 300,
   },
   output: {
     color: '#d4d4d4',

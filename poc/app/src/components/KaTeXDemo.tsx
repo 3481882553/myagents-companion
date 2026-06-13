@@ -125,7 +125,7 @@ export function KaTeXDemo() {
         {'\n'}验证项：
         {'\n'}• 公式渲染正确，无排版错误
         {'\n'}• 动态高度适配正常
-        {'\n'}• {formulas.length} 个公式总渲染时间 < 3s
+        {'\n'}• {formulas.length} 个公式总渲染时间 {'< 3s'}
       </Text>
     </ScrollView>
   );

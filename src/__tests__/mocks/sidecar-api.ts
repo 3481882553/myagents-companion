@@ -2,12 +2,14 @@
  * Mock ISidecarApi — 用于所有依赖 Sidecar API 的服务测试
  */
 
-import type { ISidecarApi } from '../../services/helper/types';
+import type { ISidecarApi } from '../../services/sidecar-api';
 
 export class MockSidecarApi implements ISidecarApi {
   get = jest.fn();
   post = jest.fn();
   sendMessage = jest.fn();
+  setToken = jest.fn();
+  clearToken = jest.fn();
 
   /** 重置所有 mock */
   reset() {

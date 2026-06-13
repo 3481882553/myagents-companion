@@ -2,7 +2,11 @@
  * Mock IKeyValueStorage — 用于所有依赖存储的服务测试
  */
 
-import type { IKeyValueStorage } from '../../services/helper/types';
+interface IKeyValueStorage {
+  getString(key: string): string | undefined;
+  set(key: string, value: string): void;
+  delete(key: string): void;
+}
 
 export class MockStorage implements IKeyValueStorage {
   private data = new Map<string, string>();

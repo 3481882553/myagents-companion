@@ -19,10 +19,9 @@ const KATEX_CDN = 'https://cdn.jsdelivr.net/npm/katex@0.16.11';
 interface KaTeXBlockProps {
   formula: string;
   displayMode?: boolean;
-  onReady?: (height: number) => void;
 }
 
-export function KaTeXBlock({ formula, displayMode = true, onReady }: KaTeXBlockProps) {
+export function KaTeXBlock({ formula, displayMode = true }: KaTeXBlockProps) {
   const [height, setHeight] = useState(50); // 默认高度
   const webViewRef = useRef<WebView>(null);
 
@@ -70,9 +69,7 @@ export function KaTeXBlock({ formula, displayMode = true, onReady }: KaTeXBlockP
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'katex:ready' && data.height) {
-        const newHeight = Math.max(data.height, 30);
-        setHeight(newHeight);
-        onReady?.(newHeight);
+        setHeight(Math.max(data.height, 30));
       }
     } catch {
       // 忽略解析错误
@@ -106,21 +103,12 @@ export function KaTeXDemo() {
 
   const [renderTime, setRenderTime] = useState<number | null>(null);
   const startTime = useRef(Date.now());
-  const readyCount = useRef(0);
-
-  const handleFormulaReady = () => {
-    readyCount.current++;
-    if (readyCount.current >= formulas.length) {
-      setRenderTime(Date.now() - startTime.current);
-    }
-  };
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>KaTeX 渲染 PoC</Text>
       <Text style={styles.info}>
         公式数量：{formulas.length} | 渲染时间：{renderTime ? `${renderTime}ms` : '测量中...'}
-        {renderTime && renderTime < 3000 ? ' ✅ 达标' : renderTime ? ' ⚠️ 超标' : ''}
       </Text>
 
       {formulas.map((f, i) => (
@@ -129,7 +117,6 @@ export function KaTeXDemo() {
           <KaTeXBlock
             formula={f.formula}
             displayMode={f.displayMode}
-            onReady={handleFormulaReady}
           />
         </View>
       ))}
