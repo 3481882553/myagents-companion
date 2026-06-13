@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyAgents Mobile Companion 原型 - 暖色版 v3.0</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei', -apple-system, system-ui, sans-serif; background: #12100e; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 20px; }
+.nav { position: fixed; top: 20px; left: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+.nav-btn { padding: 8px 14px; border-radius: 8px; background: #242018; border: 1px solid rgba(228,220,212,0.10); color: #968a7e; font-size: 12px; cursor: pointer; text-align: left; }
+.nav-btn.active { background: #c26d3a; color: #fffcf7; border-color: #c26d3a; }
+.nav-btn:hover { border-color: #c26d3a; }
+.page { display: none; }
+.page.active { display: block; }
+.phone { width: 360px; margin: 0 auto; background: #1a1614; border-radius: 28px; padding: 14px; box-shadow: 0 8px 40px rgba(0,0,0,0.4); }
+.screen { background: #1a1614; border-radius: 18px; overflow: hidden; min-height: 680px; display: flex; flex-direction: column; }
+.status-bar { display: flex; justify-content: space-between; padding: 10px 18px; font-size: 12px; color: #968a7e; }
+.conn-bar { padding: 7px 18px; background: #1a2e22; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; color: #3a9d6e; }
+.conn-dot { width: 6px; height: 6px; border-radius: 50%; }
+.conn-dot.green { background: #3a9d6e; }
+.conn-dot.red { background: #ef4444; }
+.offline-bar { padding: 7px 18px; background: rgba(220,38,38,0.08); display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; color: #ef4444; }
+.header { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; }
+.header-title { color: #e4dcd4; font-size: 20px; font-weight: 600; }
+.header-btn { width: 36px; height: 36px; border-radius: 10px; background: #242018; border: 1px solid rgba(228,220,212,0.06); color: #968a7e; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.search { margin: 0 18px 14px; background: #242018; border: 1px solid rgba(228,220,212,0.06); border-radius: 10px; padding: 11px 14px; display: flex; align-items: center; gap: 8px; }
+.search input { background: none; border: none; color: #e4dcd4; font-size: 14px; flex: 1; outline: none; }
+.search input::placeholder { color: #70665c; }
+.session-list { flex: 1; overflow-y: auto; }
+.session-item { padding: 16px 18px; display: flex; gap: 14px; cursor: pointer; border-bottom: 1px solid rgba(228,220,212,0.06); transition: background 0.15s; }
+.session-item:hover { background: #242018; }
+.session-avatar { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.session-info { flex: 1; min-width: 0; }
+.session-title { color: #e4dcd4; font-size: 15px; font-weight: 500; }
+.session-preview { color: #968a7e; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; }
+.session-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.session-time { color: #70665c; font-size: 11px; }
+.session-badge { background: #c26d3a; color: #fffcf7; font-size: 10px; padding: 2px 7px; border-radius: 9999px; min-width: 20px; text-align: center; }
+.bottom-bar { display: flex; justify-content: space-around; padding: 12px 0 24px; border-top: 1px solid rgba(228,220,212,0.06); }
+.bottom-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+.bottom-item .label { font-size: 10px; color: #70665c; }
+.bottom-item.active .label { color: #c26d3a; }
+
+/* P1 */
+.content { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 28px 22px; gap: 22px; }
+.logo { width: 72px; height: 72px; border-radius: 18px; background: #c26d3a; display: flex; align-items: center; justify-content: center; }
+.logo svg { width: 40px; height: 40px; fill: #fffcf7; }
+.title { color: #e4dcd4; font-size: 22px; font-weight: 600; text-align: center; }
+.subtitle { color: #968a7e; font-size: 14px; text-align: center; line-height: 1.5; }
+.qr-box { width: 180px; height: 180px; background: #fffcf7; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
+.qr-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; padding: 14px; }
+.qr-cell { width: 18px; height: 18px; border-radius: 2px; }
+.qr-cell.dark { background: #1c1612; }
+.qr-cell.light { background: #fffcf7; }
+.tabs { display: flex; background: #242018; border-radius: 10px; padding: 3px; width: 100%; }
+.tab { flex: 1; padding: 10px; text-align: center; font-size: 14px; border-radius: 8px; cursor: pointer; color: #968a7e; transition: all 0.2s; }
+.tab.active { background: #c26d3a; color: #fffcf7; }
+.input-group { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.input-row { display: flex; gap: 8px; }
+.input-field { flex: 1; background: #242018; border: 1px solid rgba(228,220,212,0.10); border-radius: 10px; padding: 12px 14px; color: #e4dcd4; font-size: 14px; outline: none; transition: border-color 0.2s; }
+.input-field:focus { border-color: #c26d3a; }
+.input-field::placeholder { color: #70665c; }
+.input-field.small { width: 90px; flex: none; }
+.btn { padding: 14px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; width: 100%; transition: opacity 0.15s; }
+.btn:hover { opacity: 0.9; }
+.btn-primary { background: #c26d3a; color: #fffcf7; }
+.btn-secondary { background: transparent; border: 1px solid rgba(228,220,212,0.18); color: #cfc5ba; }
+.hint { color: #70665c; font-size: 11px; text-align: center; }
+
+/* P3 */
+.chat-header { padding: 12px 18px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(228,220,212,0.06); }
+.back-btn { color: #c26d3a; font-size: 22px; cursor: pointer; background: none; border: none; }
+.chat-title { color: #e4dcd4; font-size: 16px; font-weight: 600; flex: 1; }
+.chat-status { font-size: 11px; color: #3a9d6e; }
+.messages { flex: 1; overflow-y: auto; padding: 14px 18px; display: flex; flex-direction: column; gap: 18px; }
+.msg-user { display: flex; justify-content: flex-end; }
+.user-bubble { max-width: 85%; background: #242018; border: 1px solid rgba(228,220,212,0.10); border-radius: 20px; padding: 14px 18px; color: #e4dcd4; font-size: 15px; line-height: 1.5; }
+.msg-ai { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.ai-text { color: #cfc5ba; font-size: 15px; line-height: 1.6; }
+.msg-time { font-size: 10px; color: #70665c; margin-top: 6px; }
+.tool-badge { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px; font-size: 12px; font-weight: 500; border: 1px solid; margin: 4px 0; }
+.badge-emerald { border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.08); color: #6ee7b7; }
+.badge-amber { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.08); color: #fcd34d; }
+.badge-violet { border-color: rgba(139,92,246,0.4); background: rgba(139,92,246,0.08); color: #c4b5fd; }
+.badge-purple { border-color: rgba(168,85,247,0.4); background: rgba(168,85,247,0.08); color: #d8b4fe; }
+.code-block { background: #141210; border-radius: 10px; margin: 8px 0; overflow: hidden; border: 1px solid rgba(228,220,212,0.06); }
+.code-header { display: flex; justify-content: space-between; align-items: center; padding: 7px 14px; background: #1e1a16; font-size: 11px; color: #968a7e; }
+.code-copy { background: none; border: none; color: #c26d3a; font-size: 11px; cursor: pointer; }
+.code-copy:hover { color: #e18a58; }
+.code-body { padding: 12px 14px; font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Consolas', monospace; font-size: 12px; line-height: 1.6; color: #d4d4d4; overflow-x: auto; }
+.code-kw { color: #c792ea; }
+.code-str { color: #c3e88d; }
+.code-fn { color: #82aaff; }
+.code-cm { color: #546e7a; font-style: italic; }
+.code-tp { color: #ffcb6b; }
+.mermaid-block { background: #242018; border-radius: 10px; padding: 18px; margin: 8px 0; text-align: center; border: 1px solid rgba(228,220,212,0.06); }
+.input-bar { padding: 12px 18px 24px; display: flex; gap: 10px; border-top: 1px solid rgba(228,220,212,0.06); }
+.chat-input { flex: 1; background: #242018; border: 1px solid rgba(228,220,212,0.10); border-radius: 22px; padding: 12px 18px; color: #e4dcd4; font-size: 14px; outline: none; }
+.chat-input::placeholder { color: #70665c; }
+.chat-input:focus { border-color: #c26d3a; }
+.send-btn { width: 44px; height: 44px; border-radius: 50%; background: #c26d3a; border: none; color: #fffcf7; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+.send-btn:hover { background: #e18a58; }
+.thinking { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; background: rgba(168,85,247,0.08); border: 1px solid rgba(168,85,247,0.3); border-radius: 10px; font-size: 12px; color: #d8b4fe; }
+.dots { display: flex; gap: 4px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: #9333ea; animation: blink 1.4s infinite; }
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%,80%,100%{opacity:0.3} 40%{opacity:1} }
+
+/* P4 */
+.conn-list { flex: 1; padding: 0 18px; }
+.conn-item { padding: 16px 0; border-bottom: 1px solid rgba(228,220,212,0.06); display: flex; align-items: center; gap: 14px; }
+.conn-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+.conn-info { flex: 1; }
+.conn-name { color: #e4dcd4; font-size: 15px; font-weight: 500; }
+.conn-addr { color: #968a7e; font-size: 12px; margin-top: 3px; }
+.conn-status { font-size: 11px; padding: 4px 10px; border-radius: 9999px; }
+.st-current { background: rgba(194,109,58,0.15); color: #d4803f; }
+.st-online { background: rgba(16,185,129,0.12); color: #3a9d6e; }
+.st-offline { background: rgba(220,38,38,0.12); color: #ef4444; }
+.add-btn { margin: 18px; padding: 14px; border-radius: 10px; background: #242018; border: 1px dashed rgba(228,220,212,0.18); color: #968a7e; font-size: 14px; cursor: pointer; text-align: center; }
+.overlay { position: absolute; inset: 0; background: rgba(26,22,20,0.85); display: flex; align-items: center; justify-content: center; z-index: 10; }
+.dialog { background: #242018; border: 1px solid rgba(228,220,212,0.10); border-radius: 18px; padding: 24px; width: 280px; text-align: center; }
+.dialog-icon { width: 52px; height: 52px; border-radius: 14px; background: rgba(194,109,58,0.15); margin: 0 auto 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; }
+.dialog-title { color: #e4dcd4; font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+.dialog-desc { color: #968a7e; font-size: 13px; line-height: 1.5; margin-bottom: 18px; }
+.dialog-tool { background: #141210; border: 1px solid rgba(228,220,212,0.06); border-radius: 10px; padding: 12px; margin-bottom: 18px; text-align: left; }
+.dialog-tool-name { color: #d97706; font-size: 13px; font-weight: 500; }
+.dialog-tool-cmd { color: #d4d4d4; font-size: 11px; font-family: ui-monospace, monospace; margin-top: 4px; word-break: break-all; }
+.dialog-actions { display: flex; gap: 10px; }
+.dialog-btn { flex: 1; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
+.dialog-btn:hover { opacity: 0.85; }
+.dialog-btn.deny { background: rgba(220,38,38,0.12); color: #ef4444; }
+.dialog-btn.allow { background: #c26d3a; color: #fffcf7; }
+
+/* P5 */
+.widget-box { background: #242018; border: 1px solid rgba(228,220,212,0.06); border-radius: 10px; overflow: hidden; margin: 8px 0; }
+.widget-header { padding: 9px 14px; display: flex; align-items: center; justify-content: space-between; background: rgba(228,220,212,0.03); }
+.widget-title { font-size: 11px; color: #968a7e; }
+.widget-tag { font-size: 9px; padding: 2px 7px; border-radius: 6px; background: rgba(58,122,184,0.12); color: #70a8d8; }
+.widget-body { padding: 14px; }
+.chart-bars { display: flex; align-items: flex-end; gap: 10px; height: 110px; padding: 0 6px; }
+.chart-bar { flex: 1; border-radius: 4px 4px 0 0; position: relative; transition: height 0.3s; }
+.chart-bar .val { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #968a7e; }
+.chart-bar .lbl { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #70665c; }
+.chart-legend { display: flex; gap: 14px; margin-top: 28px; justify-content: center; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #968a7e; }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+.disabled-input { background: #242018; border: 1px solid rgba(228,220,212,0.06); border-radius: 22px; padding: 12px 18px; color: #70665c; font-size: 14px; flex: 1; }
+.disabled-btn { width: 44px; height: 44px; border-radius: 50%; background: #242018; border: none; color: #70665c; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+.cache-tag { font-size: 10px; color: #968a7e; background: #242018; padding: 2px 7px; border-radius: 6px; margin-left: 6px; }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <button class="nav-btn active" onclick="showPage('p1')">P1 连接页面</button>
+  <button class="nav-btn" onclick="showPage('p2')">P2 会话列表</button>
+  <button class="nav-btn" onclick="showPage('p3')">P3 聊天阅读器</button>
+  <button class="nav-btn" onclick="showPage('p4')">P4 权限审批</button>
+  <button class="nav-btn" onclick="showPage('p5')">P5 离线+Widget</button>
+  <div style="margin-top:12px;padding:10px;background:#242018;border-radius:8px;font-size:10px;color:#70665c;line-height:1.5">
+    暖色纸质风格<br>匹配桌面端设计体系<br>Warm Paper / Warm Night
+  </div>
+</div>
+
+<!-- P1 连接页面 -->
+<div id="p1" class="page active">
+<div class="phone">
+  <div class="screen">
+    <div class="status-bar"><span>9:41</span><span>85%</span></div>
+    <div class="content">
+      <div class="logo"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></div>
+      <div><div class="title">连接桌面端</div><div class="subtitle">扫描二维码或手动输入连接信息</div></div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab(this,'scan','manual')">扫码连接</div>
+        <div class="tab" onclick="switchTab(this,'manual','scan')">手动输入</div>
+      </div>
+      <div id="scan" style="display:flex;flex-direction:column;align-items:center;gap:16px;width:100%">
+        <div class="qr-box"><div class="qr-grid">
+          <div class="qr-cell dark"></div><div class="qr-cell dark"></div><div class="qr-cell dark"></div><div class="qr-cell light"></div><div class="qr-cell dark"></div><div class="qr-cell dark"></div><div class="qr-cell dark"></div>
+          <div class="qr-cell dark"></div><div class="qr-cell light"></div><div class="qr-cell dark"></div><div class="qr-cell light"></div><div class="qr-cell dark"></div><div class="qr-cell light"></div><div class="qr-cell dark"></div>
+          <div class="qr-cell dark"></div><div class="qr-cell dark"></div><div class="qr-cell dark"></div><div class="qr-cell light"></div><div class="qr-cell dark"></div><div class="qr-cell dark"></div><div class="qr-cell dark"></div>
+          <div class="qr-cell light"></div><div class="qr-cell light"></div><div class="qr-cell light"></div><div class="qr-cell dark"></div><div class="qr-cell light"></div><div class="qr-cell light"></div><div class="qr-cell light"></div>
+          <div class="qr-cell dark"></div><div class="qr-cell dark"></div><div class="qr-cell dark"></div><div class="qr-cell light"></div><div class="qr-cell dark"></div><div class="qr-cell dark"></div><div class="qr-cell dark"></div>
+          <div class="qr-cell dark"></div><div class="qr-cell light"></div><div class="qr-cell dark"></div><div class="qr-cell light"></div><div class="qr-cell dark"></div><div class="qr-cell light"></div><div class="qr-cell dark"></div>
+          <div class="qr-cell dark"></div><div class="qr-cell dark"></div><div class="qr-cell dark"></div><div class="qr-cell light"></div><div class="qr-cell dark"></div><div class="qr-cell dark"></div><div class="qr-cell dark"></div>
+        </div></div>
+        <div class="hint">将摄像头对准桌面端显示的二维码</div>
+      </div>
+      <div id="manual" style="display:none;flex-direction:column;gap:12px;width:100%">
+        <div class="input-group">
+          <div class="input-row">
+            <input class="input-field" placeholder="IP 地址" value="192.168.1.5">
+            <input class="input-field small" placeholder="端口" value="3210">
+          </div>
+          <input class="input-field" placeholder="配对码（6 位数字）" type="password">
+        </div>
+        <button class="btn btn-primary">连接</button>
+        <div class="hint">配对码显示在桌面端设置页面</div>
+      </div>
+      <button class="btn btn-secondary">查看已保存的连接</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- P2 会话列表 -->
+<div id="p2" class="page">
+<div class="phone">
+  <div class="screen">
+    <div class="status-bar"><span>9:41</span><span>85%</span></div>
+    <div class="conn-bar"><div class="conn-dot green"></div>已连接 · 192.168.1.5:3210</div>
+    <div class="header"><div class="header-title">会话</div><button class="header-btn">⚙</button></div>
+    <div class="search"><span style="color:#70665c">🔍</span><input placeholder="搜索会话..." /></div>
+    <div class="session-list">
+      <div class="session-item"><div class="session-avatar" style="background:rgba(16,185,129,0.12)">📄</div><div class="session-info"><div class="session-title">React 项目重构</div><div class="session-preview">已将 UserService.ts 重构为 Repository 模式...</div></div><div class="session-meta"><div class="session-time">刚刚</div><div class="session-badge">3</div></div></div>
+      <div class="session-item"><div class="session-avatar" style="background:rgba(14,165,233,0.12)">📊</div><div class="session-info"><div class="session-title">数据分析报告</div><div class="session-preview">Q2 用户增长率为 23%，日活突破 3400...</div></div><div class="session-meta"><div class="session-time">10 分钟前</div></div></div>
+      <div class="session-item"><div class="session-avatar" style="background:rgba(139,92,246,0.12)">🔧</div><div class="session-info"><div class="session-title">API 文档生成</div><div class="session-preview">已完成 /api/users 端点的 OpenAPI 定义...</div></div><div class="session-meta"><div class="session-time">1 小时前</div></div></div>
+      <div class="session-item"><div class="session-avatar" style="background:rgba(245,158,11,0.12)">🐛</div><div class="session-info"><div class="session-title">Bug 修复：登录超时</div><div class="session-preview">根因是 SessionStore 的 TTL 设置过短...</div></div><div class="session-meta"><div class="session-time">昨天</div></div></div>
+      <div class="session-item"><div class="session-avatar" style="background:rgba(99,102,241,0.12)">📝</div><div class="session-info"><div class="session-title">周报撰写</div><div class="session-preview">本周完成 3 个 feature，修复 5 个 bug...</div></div><div class="session-meta"><div class="session-time">昨天</div></div></div>
+      <div class="session-item"><div class="session-avatar" style="background:rgba(168,85,247,0.12)">🎨</div><div class="session-info"><div class="session-title">设计系统搭建</div><div class="session-preview">Token 体系定义完成，组件库开始搭建...</div></div><div class="session-meta"><div class="session-time">3 天前</div></div></div>
+    </div>
+    <div class="bottom-bar">
+      <div class="bottom-item active"><span style="font-size:18px">💬</span><span class="label">会话</span></div>
+      <div class="bottom-item"><span style="font-size:18px">🔗</span><span class="label">连接</span></div>
+      <div class="bottom-item"><span style="font-size:18px">⚙</span><span class="label">设置</span></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- P3 聊天阅读器 -->
+<div id="p3" class="page">
+<div class="phone">
+  <div class="screen">
+    <div class="status-bar"><span>9:41</span><span>85%</span></div>
+    <div class="chat-header"><button class="back-btn">‹</button><div><div class="chat-title">React 项目重构</div><div class="chat-status">● 运行中</div></div></div>
+    <div class="messages">
+      <div class="msg-user"><div class="user-bubble">帮我重构 UserService.ts，使用新的 Repository 模式</div></div>
+      <div class="msg-ai"><div class="thinking"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>正在分析代码结构...</div></div>
+      <div class="msg-ai">
+        <div class="tool-badge badge-emerald">📄 Read src/services/UserService.ts</div>
+        <div class="ai-text">好的，我来重构这个文件。先看当前结构：</div>
+        <div class="code-block">
+          <div class="code-header"><span>typescript</span><button class="code-copy">复制</button></div>
+          <div class="code-body"><span class="code-kw">export class</span> <span class="code-tp">UserService</span> {
+  <span class="code-kw">private</span> db: <span class="code-tp">Database</span>;
+
+  <span class="code-kw">async</span> <span class="code-fn">findById</span>(id: <span class="code-tp">string</span>) {
+    <span class="code-kw">const</span> user = <span class="code-kw">await</span> <span class="code-kw">this</span>.db
+      .<span class="code-fn">query</span>(<span class="code-str">`SELECT * FROM users WHERE id = ?`</span>, [id]);
+    <span class="code-kw">return</span> user;
+  }
+}</div>
+        </div>
+        <div class="tool-badge badge-amber">$_ npm run test -- --coverage</div>
+        <div class="ai-text">重构为 Repository 模式：</div>
+        <div class="code-block">
+          <div class="code-header"><span>typescript</span><button class="code-copy">复制</button></div>
+          <div class="code-body"><span class="code-kw">export class</span> <span class="code-tp">UserService</span> {
+  <span class="code-kw">constructor</span>(
+    <span class="code-kw">private</span> userRepo: <span class="code-tp">UserRepository</span>
+  ) {}
+
+  <span class="code-kw">async</span> <span class="code-fn">findById</span>(id: <span class="code-tp">string</span>) {
+    <span class="code-kw">return</span> <span class="code-kw">this</span>.userRepo.<span class="code-fn">findById</span>(id);
+  }
+}</div>
+        </div>
+        <div class="ai-text" style="font-size:12px;color:#968a7e;margin-top:4px">依赖关系：</div>
+        <div class="mermaid-block">
+          <svg viewBox="0 0 260 110" style="max-height:90px">
+            <rect x="10" y="10" width="90" height="32" rx="8" fill="rgba(58,122,184,0.12)" stroke="#4a7ab5" stroke-width="1"/>
+            <text x="55" y="30" text-anchor="middle" fill="#70a8d8" font-size="12" font-family="system-ui">Controller</text>
+            <rect x="150" y="10" width="100" height="32" rx="8" fill="rgba(139,92,246,0.12)" stroke="#7c3aed" stroke-width="1"/>
+            <text x="200" y="30" text-anchor="middle" fill="#c4b5fd" font-size="12" font-family="system-ui">UserService</text>
+            <rect x="150" y="65" width="100" height="32" rx="8" fill="rgba(16,185,129,0.12)" stroke="#059669" stroke-width="1"/>
+            <text x="200" y="85" text-anchor="middle" fill="#6ee7b7" font-size="12" font-family="system-ui">UserRepository</text>
+            <line x1="100" y1="26" x2="150" y2="26" stroke="#968a7e" stroke-width="1" marker-end="url(#a1)"/>
+            <line x1="200" y1="42" x2="200" y2="65" stroke="#968a7e" stroke-width="1" marker-end="url(#a1)"/>
+            <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#968a7e"/></marker></defs>
+          </svg>
+        </div>
+        <div class="msg-time">9:39</div>
+      </div>
+    </div>
+    <div class="input-bar"><input class="chat-input" placeholder="输入消息..." /><button class="send-btn">↑</button></div>
+  </div>
+</div>
+</div>
+
+<!-- P4 权限审批 + 连接管理 -->
+<div id="p4" class="page">
+<div class="phone">
+  <div class="screen">
+    <div class="status-bar"><span>9:41</span><span>85%</span></div>
+    <div class="header"><button class="back-btn">‹</button><div class="header-title">连接管理</div></div>
+    <div class="conn-list">
+      <div class="conn-item"><div class="conn-icon" style="background:rgba(194,109,58,0.12);color:#d4803f">💻</div><div class="conn-info"><div class="conn-name">书房电脑</div><div class="conn-addr">192.168.1.5:3210</div></div><span class="conn-status st-current">当前</span></div>
+      <div class="conn-item"><div class="conn-icon" style="background:rgba(16,185,129,0.12);color:#3a9d6e">🖥</div><div class="conn-info"><div class="conn-name">办公室电脑</div><div class="conn-addr">10.0.0.12:3210</div></div><span class="conn-status st-online">在线</span></div>
+      <div class="conn-item"><div class="conn-icon" style="background:rgba(139,92,246,0.12);color:#7c3aed">💻</div><div class="conn-info"><div class="conn-name">笔记本</div><div class="conn-addr">my-tunnel.example.com</div></div><span class="conn-status st-offline">离线</span></div>
+    </div>
+    <div class="add-btn">+ 添加新连接</div>
+    <div class="overlay">
+      <div class="dialog">
+        <div class="dialog-icon">🔐</div>
+        <div class="dialog-title">权限审批请求</div>
+        <div class="dialog-desc">AI 请求执行以下操作，请确认是否允许</div>
+        <div class="dialog-tool"><div class="dialog-tool-name">Bash 命令</div><div class="dialog-tool-cmd">npm run test -- --coverage</div></div>
+        <div class="dialog-actions"><button class="dialog-btn deny">拒绝</button><button class="dialog-btn allow">允许</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- P5 离线 + Widget -->
+<div id="p5" class="page">
+<div class="phone">
+  <div class="screen">
+    <div class="status-bar"><span>9:41</span><span>85%</span></div>
+    <div class="offline-bar"><div class="conn-dot red"></div>离线模式 · 显示缓存内容</div>
+    <div class="chat-header"><button class="back-btn">‹</button><div class="chat-title">数据分析报告 <span class="cache-tag">缓存</span></div></div>
+    <div class="messages">
+      <div class="msg-ai">
+        <div class="ai-text">Q2 用户增长分析如下：</div>
+        <div class="widget-box">
+          <div class="widget-header"><span class="widget-title">用户增长趋势</span><span class="widget-tag">Widget</span></div>
+          <div class="widget-body">
+            <div class="chart-bars">
+              <div class="chart-bar" style="height:40%;background:#c26d3a"><span class="val">2.1k</span><span class="lbl">3月</span></div>
+              <div class="chart-bar" style="height:55%;background:#c26d3a"><span class="val">2.8k</span><span class="lbl">4月</span></div>
+              <div class="chart-bar" style="height:70%;background:#c26d3a"><span class="val">3.5k</span><span class="lbl">5月</span></div>
+              <div class="chart-bar" style="height:90%;background:#d4803f"><span class="val">4.2k</span><span class="lbl">6月</span></div>
+            </div>
+            <div class="chart-legend">
+              <div class="legend-item"><div class="legend-dot" style="background:#c26d3a"></div>新增用户</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#d4803f"></div>预测值</div>
+            </div>
+          </div>
+        </div>
+        <div class="ai-text">关键指标：<br>· 总用户数：12,847（+23% MoM）<br>· 日活用户：3,421（+18%）<br>· 留存率：67%（+5pp）</div>
+        <div class="msg-time">昨天 14:32</div>
+      </div>
+    </div>
+    <div class="input-bar"><input class="disabled-input" placeholder="离线状态无法发送消息" disabled /><button class="disabled-btn" disabled>↑</button></div>
+  </div>
+</div>
+</div>
+
+<script>
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+function switchTab(el, show, hide) {
+  el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(show).style.display = 'flex';
+  document.getElementById(hide).style.display = 'none';
+}
+</script>
+</body>
+</html>
