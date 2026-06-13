@@ -19,10 +19,8 @@ describe('sessionStore', () => {
 
   describe('初始状态', () => {
     it('默认状态', () => {
-      expect(store.getState()).toEqual({
-        sessions: [],
-        currentSession: null,
-      });
+      expect(store.getState().sessions).toEqual([]);
+      expect(store.getState().currentSession).toBeNull();
     });
   });
 

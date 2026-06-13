@@ -33,5 +33,11 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '\\.(css|less)$': '<rootDir>/src/__tests__/mocks/style-mock.js',
     '\\.(md)$': '<rootDir>/src/__tests__/mocks/file-mock.js',
+    '^react$': '<rootDir>/src/__tests__/mocks/react.js',
+    '^react-native$': '<rootDir>/src/__tests__/mocks/react-native.js',
+    '^react-native-mmkv$': '<rootDir>/src/__tests__/mocks/react-native-mmkv.js',
+    '^react-native-webview$': '<rootDir>/src/__tests__/mocks/react-native-webview.js',
+    '^react-native-keychain$': '<rootDir>/src/__tests__/mocks/react-native-keychain.js',
+    '^react-native-sse$': '<rootDir>/src/__tests__/mocks/react-native-sse.js',
   },
 };

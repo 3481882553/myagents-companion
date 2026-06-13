@@ -19,11 +19,9 @@ describe('connectionStore', () => {
 
   describe('初始状态', () => {
     it('默认状态', () => {
-      expect(store.getState()).toEqual({
-        status: 'disconnected',
-        token: null,
-        host: null,
-      });
+      expect(store.getState().status).toBe('disconnected');
+      expect(store.getState().token).toBeNull();
+      expect(store.getState().host).toBeNull();
     });
   });
 
@@ -48,11 +46,9 @@ describe('connectionStore', () => {
       store.getState().setConnection('192.168.1.5:32101');
       store.getState().setToken('test-token');
       store.getState().disconnect();
-      expect(store.getState()).toEqual({
-        status: 'disconnected',
-        token: null,
-        host: null,
-      });
+      expect(store.getState().status).toBe('disconnected');
+      expect(store.getState().token).toBeNull();
+      expect(store.getState().host).toBeNull();
     });
   });
 });

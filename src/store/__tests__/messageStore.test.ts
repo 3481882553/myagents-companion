@@ -18,10 +18,8 @@ describe('messageStore', () => {
 
   describe('初始状态', () => {
     it('默认状态', () => {
-      expect(store.getState()).toEqual({
-        messages: {},
-        streaming: {},
-      });
+      expect(store.getState().messages).toEqual({});
+      expect(store.getState().streaming).toEqual({});
     });
   });
 
@@ -40,7 +38,7 @@ describe('messageStore', () => {
     it('完成流式消息', () => {
       store.getState().startStreaming('msg-001');
       store.getState().appendChunk('msg-001', 'Hello');
-      store.getState().completeStreaming('msg-001');
+      store.getState().completeStreaming('msg-001', 'ses-001');
       expect(store.getState().streaming['msg-001']).toBeUndefined();
       expect(store.getState().messages['ses-001']).toBeDefined();
     });
@@ -49,7 +47,7 @@ describe('messageStore', () => {
   describe('消息加载', () => {
     it('加载历史消息', () => {
       const messages = [
-        { id: 'msg-001', role: 'user', content: 'test', createdAt: Date.now() },
+        { id: 'msg-001', role: 'user' as const, content: 'test', createdAt: Date.now() },
       ];
       store.getState().loadMessages('ses-001', messages);
       expect(store.getState().messages['ses-001']).toHaveLength(1);
