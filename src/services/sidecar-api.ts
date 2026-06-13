@@ -9,6 +9,8 @@ export interface ISidecarApi {
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body?: any): Promise<T>;
   sendMessage(sessionId: string, content: string): Promise<void>;
+  setToken(token: string): void;
+  clearToken(): void;
 }
 
 export class SidecarHttpApi implements ISidecarApi {
