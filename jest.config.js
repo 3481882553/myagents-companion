@@ -1,7 +1,8 @@
 /** @type {import('jest').Config} */
 module.exports = {
-  preset: 'react-native',
-  setupFilesAfterFramework: ['<rootDir>/src/__tests__/setup.ts'],
+  // preset: 'react-native',  // 需要 RN 项目初始化后启用
+  testEnvironment: 'node',
+  setupFiles: ['<rootDir>/src/__tests__/setup.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   transform: {
     '^.+\\.(ts|tsx)$': 'ts-jest',
