@@ -4,3 +4,12 @@ build/
 *.log
 .DS_Store
 Thumbs.db
+
+# React Native
+poc/app/node_modules/
+poc/app/android/.gradle/
+poc/app/android/app/build/
+poc/app/android/build/
+poc/app/ios/Pods/
+poc/app/ios/build/
+*.hprof
