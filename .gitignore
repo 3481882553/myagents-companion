@@ -13,3 +13,4 @@ poc/app/android/build/
 poc/app/ios/Pods/
 poc/app/ios/build/
 *.hprof
+npm-cache/
