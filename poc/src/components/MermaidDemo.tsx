@@ -38,40 +38,47 @@ export function MermaidDiagram({ code, theme = 'light' }: MermaidDiagramProps) {
 <body>
   <div id="mermaid-container"></div>
   <script>
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: '${theme === 'dark' ? 'dark' : 'default'}',
-      securityLevel: 'strict'
-    });
+    function initMermaid() {
+      if (typeof mermaid === 'undefined') {
+        setTimeout(initMermaid, 100);
+        return;
+      }
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: '${theme === 'dark' ? 'dark' : 'default'}',
+        securityLevel: 'strict'
+      });
 
-    const startTime = Date.now();
-    try {
-      mermaid.render('mermaid-graph', ${JSON.stringify(code)}).then(result => {
-        document.getElementById('mermaid-container').innerHTML = result.svg;
-        const nodeCount = document.querySelectorAll('.node').length;
-        const svgSize = result.svg.length;
-        const elapsed = Date.now() - startTime;
+      const startTime = Date.now();
+      try {
+        mermaid.render('mermaid-graph', ${JSON.stringify(code)}).then(result => {
+          document.getElementById('mermaid-container').innerHTML = result.svg;
+          const nodeCount = document.querySelectorAll('.node').length;
+          const svgSize = result.svg.length;
+          const elapsed = Date.now() - startTime;
 
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'mermaid:ready',
-          svg: result.svg,
-          renderTime: elapsed,
-          nodeCount: nodeCount,
-          svgSize: svgSize,
-          height: document.body.scrollHeight
-        }));
-      }).catch(e => {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'mermaid:ready',
+            svg: result.svg,
+            renderTime: elapsed,
+            nodeCount: nodeCount,
+            svgSize: svgSize,
+            height: document.body.scrollHeight
+          }));
+        }).catch(e => {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'mermaid:error',
+            error: e.message
+          }));
+        });
+      } catch (e) {
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'mermaid:error',
           error: e.message
         }));
-      });
-    } catch (e) {
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        type: 'mermaid:error',
-        error: e.message
-      }));
+      }
     }
+    initMermaid();
   </script>
 </body>
 </html>`;

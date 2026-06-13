@@ -8,23 +8,33 @@
 
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { HomeScreen } from './src/screens/HomeScreen';
+import { ConnectionScreen } from './src/screens/ConnectionScreen';
 import { KaTeXDemo } from './src/components/KaTeXDemo';
 import { MermaidDemo } from './src/components/MermaidDemo';
 import { BashToolDemo } from './src/components/BashToolDemo';
 
-type Screen = 'home' | 'katex' | 'mermaid' | 'bash';
+type Screen = 'home' | 'connection' | 'katex' | 'mermaid' | 'bash' | 'helper';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
 
   const renderScreen = () => {
     switch (screen) {
+      case 'connection':
+        return <ConnectionScreen onBack={() => setScreen('home')} />;
       case 'katex':
         return <KaTeXDemo />;
       case 'mermaid':
         return <MermaidDemo />;
       case 'bash':
         return <BashToolDemo />;
+      case 'helper':
+        return (
+          <View style={styles.placeholder}>
+            <Text style={styles.placeholderText}>🤖 小助理（W11 实现）</Text>
+          </View>
+        );
       default:
         return <HomeScreen onNavigate={setScreen} />;
     }
@@ -42,70 +52,10 @@ export default function App() {
   );
 }
 
-function HomeScreen({ onNavigate }: { onNavigate: (s: Screen) => void }) {
-  return (
-    <View style={styles.home}>
-      <Text style={styles.title}>MyAgents Companion PoC</Text>
-      <Text style={styles.subtitle}>Phase 0 — 技术验证</Text>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>W1：渲染 PoC</Text>
-        <DemoButton label="KaTeX 公式渲染" onPress={() => onNavigate('katex')} />
-        <DemoButton label="Mermaid 图表渲染" onPress={() => onNavigate('mermaid')} />
-        <DemoButton label="BashTool 终端输出" onPress={() => onNavigate('bash')} />
-      </View>
-    </View>
-  );
-}
-
-function DemoButton({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <TouchableOpacity style={styles.demoBtn} onPress={onPress}>
-      <Text style={styles.demoBtnText}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#faf6ee',
-  },
-  home: {
-    flex: 1,
-    padding: 24,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1c1612',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6f6156',
-    marginBottom: 32,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2e2825',
-    marginBottom: 12,
-  },
-  demoBtn: {
-    backgroundColor: '#fffcf7',
-    borderWidth: 1,
-    borderColor: 'rgba(28, 22, 18, 0.10)',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 8,
-  },
-  demoBtnText: {
-    fontSize: 15,
-    color: '#1c1612',
   },
   backBtn: {
     padding: 12,
@@ -114,5 +64,14 @@ const styles = StyleSheet.create({
   backText: {
     fontSize: 15,
     color: '#c26d3a',
+  },
+  placeholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    fontSize: 18,
+    color: '#6f6156',
   },
 });
