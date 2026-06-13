@@ -32,20 +32,31 @@ export function ConnectionScreen({ onConnected, onBack }: ConnectionScreenProps)
     setError('');
 
     try {
-      // 模拟连接（PoC 阶段）
       const fullHost = `${host.trim()}:${port}`;
 
-      // 尝试健康检查
-      const response = await fetch(`http://${fullHost}/health/live`, {
-        method: 'GET',
-        timeout: 5000,
-      } as any);
+      // 健康检查（带超时）
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-      if (response.ok) {
-        setStatus('connected');
-        onConnected?.(fullHost);
-      } else {
-        throw new Error('连接失败');
+      try {
+        const response = await fetch(`http://${fullHost}/health/live`, {
+          method: 'GET',
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          setStatus('connected');
+          onConnected?.(fullHost);
+        } else {
+          throw new Error('连接失败');
+        }
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') {
+          throw new Error('连接超时');
+        }
+        throw fetchErr;
       }
     } catch (err: any) {
       setStatus('error');
