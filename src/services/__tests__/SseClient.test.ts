@@ -257,19 +257,31 @@ describe('SseClient', () => {
   // ========== 重连机制 ==========
 
   describe('重连机制', () => {
-    it('指数退避：500ms → 1s → 2s → 4s → ...', () => {
+    it('指数退避：500ms → 1s → 2s → 4s → ...，上限 30s', () => {
       const client = createClient();
       client.connect();
       MockEventSource.latest()?.simulateOpen();
 
-      // 模拟多次断开
-      for (let i = 0; i < 5; i++) {
+      // 模拟多次断开，验证延迟递增和上限
+      const delays: number[] = [];
+      for (let i = 0; i < 10; i++) {
         MockEventSource.latest()?.simulateError();
+        delays.push(client.retryDelay);
         jest.advanceTimersByTime(client.retryDelay);
       }
 
-      // 验证延迟递增（500, 1000, 2000, 4000, 8000）
-      expect(client.retryDelay).toBeGreaterThanOrEqual(500);
+      // 验证延迟递增（500, 1000, 2000, 4000, 8000, 16000, 30000, 30000, ...）
+      expect(delays[0]).toBe(500);
+      expect(delays[1]).toBe(1000);
+      expect(delays[2]).toBe(2000);
+      expect(delays[3]).toBe(4000);
+      expect(delays[4]).toBe(8000);
+      expect(delays[5]).toBe(16000);
+
+      // 验证上限不超过 30s
+      for (const delay of delays) {
+        expect(delay).toBeLessThanOrEqual(30000);
+      }
     });
 
     it('超过最大重试次数转为 DISCONNECTED', () => {

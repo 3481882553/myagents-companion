@@ -120,4 +120,18 @@ describe('toolBadgeColors', () => {
       expect(Object.keys(toolBadgeColors)).toHaveLength(9);
     });
   });
+
+  describe('snapshot 防护', () => {
+    it('亮色模式颜色配置 snapshot', () => {
+      // 去除 icon（ReactNode 不可序列化）后 snapshot
+      const serializable = Object.fromEntries(
+        Object.entries(toolBadgeColors).map(([key, val]) => [key, { ...val, icon: '<Icon>' }])
+      );
+      expect(serializable).toMatchSnapshot();
+    });
+
+    it('暗色模式颜色配置 snapshot', () => {
+      expect(toolBadgeColorsDark).toMatchSnapshot();
+    });
+  });
 });

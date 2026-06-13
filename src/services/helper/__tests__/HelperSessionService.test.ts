@@ -108,6 +108,30 @@ describe('HelperSessionService', () => {
       // 应使用内置版本而非旧版本
       expect(callArgs.claudeMd).not.toBe('# Old version');
     });
+
+    it('创建会话 API 返回 401 时抛出错误', async () => {
+      const { service, api } = createService();
+      api.get.mockRejectedValue(new Error('Not Found'));
+      api.post.mockRejectedValue(new Error('Unauthorized'));
+
+      await expect(service.ensureHelperSession()).rejects.toThrow('Unauthorized');
+    });
+
+    it('创建会话 API 返回 500 时抛出错误', async () => {
+      const { service, api } = createService();
+      api.get.mockRejectedValue(new Error('Not Found'));
+      api.post.mockRejectedValue(new Error('Internal Server Error'));
+
+      await expect(service.ensureHelperSession()).rejects.toThrow('Internal Server Error');
+    });
+
+    it('网络断开时抛出错误', async () => {
+      const { service, api } = createService();
+      api.get.mockRejectedValue(new Error('Network request failed'));
+      api.post.mockRejectedValue(new Error('Network request failed'));
+
+      await expect(service.ensureHelperSession()).rejects.toThrow('Network request failed');
+    });
   });
 
   describe('sendInitialMessage', () => {

@@ -103,5 +103,26 @@ describe('LogQueryService', () => {
 
       await expect(service.searchLogs('test')).rejects.toThrow('Sidecar offline');
     });
+
+    it('401 认证失败向上传播', async () => {
+      const { service, api } = createService();
+      api.get.mockRejectedValue(new Error('Unauthorized'));
+
+      await expect(service.searchLogs('test')).rejects.toThrow('Unauthorized');
+    });
+
+    it('500 服务器错误向上传播', async () => {
+      const { service, api } = createService();
+      api.get.mockRejectedValue(new Error('Internal Server Error'));
+
+      await expect(service.searchLogs('test')).rejects.toThrow('Internal Server Error');
+    });
+
+    it('网络超时向上传播', async () => {
+      const { service, api } = createService();
+      api.get.mockRejectedValue(new Error('Request timeout'));
+
+      await expect(service.searchLogs('test')).rejects.toThrow('Request timeout');
+    });
   });
 });
