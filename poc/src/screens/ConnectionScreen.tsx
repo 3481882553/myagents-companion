@@ -125,9 +125,9 @@ export function ConnectionScreen({ onConnected, onBack }: ConnectionScreenProps)
       </TouchableOpacity>
 
       {/* 扫码连接（预留） */}
-      <TouchableOpacity style={styles.scanBtn}>
-        <Text style={styles.scanBtnText}>📷 扫码连接</Text>
-      </TouchableOpacity>
+      <View style={styles.scanPlaceholder}>
+        <Text style={styles.scanPlaceholderText}>📷 扫码连接（W10 实现）</Text>
+      </View>
     </View>
   );
 }
@@ -220,8 +220,16 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
   },
-  scanBtnText: {
-    fontSize: 15,
-    color: '#6f6156',
+  scanPlaceholder: {
+    borderWidth: 1,
+    borderColor: 'rgba(28, 22, 18, 0.10)',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+  },
+  scanPlaceholderText: {
+    fontSize: 14,
+    color: '#968a7e',
   },
 });

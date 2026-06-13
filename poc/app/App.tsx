@@ -6,8 +6,8 @@
  * W3：端到端 Spike
  */
 
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, BackHandler } from 'react-native';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ConnectionScreen } from './src/screens/ConnectionScreen';
 import { KaTeXDemo } from './src/components/KaTeXDemo';
@@ -18,6 +18,18 @@ type Screen = 'home' | 'connection' | 'katex' | 'mermaid' | 'bash' | 'helper';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
+
+  // Android 返回键处理
+  useEffect(() => {
+    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (screen !== 'home') {
+        setScreen('home');
+        return true; // 已处理
+      }
+      return false; // 交给系统处理（退出 App）
+    });
+    return () => handler.remove();
+  }, [screen]);
 
   const renderScreen = () => {
     switch (screen) {
@@ -42,11 +54,6 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {screen !== 'home' && (
-        <TouchableOpacity style={styles.backBtn} onPress={() => setScreen('home')}>
-          <Text style={styles.backText}>← 返回</Text>
-        </TouchableOpacity>
-      )}
       {renderScreen()}
     </SafeAreaView>
   );
