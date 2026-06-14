@@ -14,6 +14,7 @@ import { ChatScreen, Message } from './src/screens/ChatScreen';
 import { KaTeXDemo } from './src/components/KaTeXDemo';
 import { MermaidDemo } from './src/components/MermaidDemo';
 import { BashToolDemo } from './src/components/BashToolDemo';
+import { HelperScreen } from './src/screens/HelperScreen';
 import { saveConnectionHistory } from './src/utils/connectionStorage';
 
 type Screen = 'home' | 'connection' | 'sessions' | 'chat' | 'katex' | 'mermaid' | 'bash' | 'helper';
@@ -114,9 +115,11 @@ export default function App() {
         return <BashToolDemo />;
       case 'helper':
         return (
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>🤖 小助理（W11 实现）</Text>
-          </View>
+          <HelperScreen
+            host={state.connectedHost || undefined}
+            token={state.token}
+            onBack={() => setScreen('home')}
+          />
         );
       default:
         return <HomeScreen onNavigate={setScreen} />;

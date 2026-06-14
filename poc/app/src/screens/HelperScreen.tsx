@@ -98,6 +98,20 @@ export function HelperScreen({ host, token, onBack }: HelperScreenProps) {
           return;
         }
 
+        // 记录发送前的总消息数
+        let preSendMsgCount = 0;
+        try {
+          const ctrl0 = new AbortController();
+          const tid0 = setTimeout(() => ctrl0.abort(), 5000);
+          const preRes = await fetch(`http://${host}/api/session/messages?sessionId=${helperSession.id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: ctrl0.signal,
+          });
+          clearTimeout(tid0);
+          const preData = await preRes.json();
+          preSendMsgCount = (preData.messages || []).length;
+        } catch {}
+
         // 发送消息
         await fetch(`http://${host}/api/session/send`, {
           method: 'POST',
@@ -105,11 +119,17 @@ export function HelperScreen({ host, token, onBack }: HelperScreenProps) {
           body: JSON.stringify({ sessionId: helperSession.id, message: msg }),
         });
 
-        // 等待回复（轮询）
+        // 等待回复（轮询，最多 15 次，每次 2 秒）
         let retryCount = 0;
-        const maxRetries = 5;
+        const maxRetries = 15;
         const pollReply = async () => {
           if (retryCount >= maxRetries) {
+            setMessages(prev => [...prev, {
+              id: `timeout_${Date.now()}`,
+              role: 'assistant',
+              content: '⚠️ 回复超时，请稍后再试。',
+              timestamp: Date.now(),
+            }]);
             setLoading(false);
             return;
           }
@@ -123,18 +143,30 @@ export function HelperScreen({ host, token, onBack }: HelperScreenProps) {
             });
             clearTimeout(tid);
             const data = await res.json();
+            const allMsgs = data.messages || [];
 
-            // 获取最后一条 assistant 消息
-            const assistantMsgs = data.messages?.filter((m: any) => m.role === 'assistant') || [];
-            const lastReply = assistantMsgs[assistantMsgs.length - 1];
+            // 检查消息数量是否增加（有新回复）
+            if (allMsgs.length > preSendMsgCount) {
+              // 找最后一条有内容的 assistant 消息
+              const assistantMsgs = allMsgs.filter((m: any) => m.role === 'assistant');
+              const lastReply = assistantMsgs[assistantMsgs.length - 1];
 
-            if (lastReply?.content && lastReply.content.length > 10) {
-              setMessages(prev => [...prev, {
-                id: `reply_${Date.now()}`,
-                role: 'assistant',
-                content: lastReply.content,
-                timestamp: Date.now(),
-              }]);
+              if (lastReply?.content && lastReply.content.trim().length > 0) {
+                setMessages(prev => [...prev, {
+                  id: `reply_${Date.now()}`,
+                  role: 'assistant',
+                  content: lastReply.content,
+                  timestamp: Date.now(),
+                }]);
+              } else {
+                // 有新消息但 content 为空（可能是纯工具调用）
+                setMessages(prev => [...prev, {
+                  id: `reply_${Date.now()}`,
+                  role: 'assistant',
+                  content: '✅ 已处理完成。',
+                  timestamp: Date.now(),
+                }]);
+              }
               setLoading(false);
             } else {
               setTimeout(pollReply, 2000);
