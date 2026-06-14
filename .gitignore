@@ -14,3 +14,13 @@ poc/app/ios/Pods/
 poc/app/ios/build/
 *.hprof
 npm-cache/
+
+# 安全敏感文件
+.env
+.env.*
+*.pem
+*.key
+*.keystore
+*.jks
+google-services.json
+
