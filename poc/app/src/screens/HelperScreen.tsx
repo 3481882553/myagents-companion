@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert } from 'react-native';
 import { MarkdownRenderer } from '../components/markdown/MarkdownRenderer';
 
 interface HelperMessage {
@@ -27,6 +27,7 @@ const QUICK_ACTIONS = [
   { id: 'status', label: '🔍 系统状态', prompt: '查询当前系统状态，包括 Provider、MCP 服务器、连接状态' },
   { id: 'logs', label: '📋 查看日志', prompt: '查看最近的错误日志和警告' },
   { id: 'diagnose', label: '🩺 诊断问题', prompt: '帮我诊断当前的问题，检查连接、配置、日志' },
+  { id: 'device', label: '📱 设备信息', prompt: '查看手机设备信息和应用状态' },
   { id: 'issue', label: '🐛 提交 Issue', prompt: '我想提交一个 GitHub Issue，请帮我收集信息并创建' },
   { id: 'help', label: '❓ 使用帮助', prompt: '介绍一下你能做什么，怎么使用' },
 ];
@@ -67,7 +68,8 @@ export function HelperScreen({ host, token, onBack }: HelperScreenProps) {
     // 滚动到底部
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
 
-    // 调用 Sidecar 发送消息（小助理会话）
+    // 直接发给 Sidecar（和桌面端小助理一样，AI 自己决定怎么处理）
+    // AI 可以通过 Bash 工具读日志、查状态、提交 Issue 等
     if (host && token) {
       try {
         const controller = new AbortController();

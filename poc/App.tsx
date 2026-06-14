@@ -15,6 +15,7 @@ import { KaTeXDemo } from './src/components/KaTeXDemo';
 import { MermaidDemo } from './src/components/MermaidDemo';
 import { BashToolDemo } from './src/components/BashToolDemo';
 import { HelperScreen } from './src/screens/HelperScreen';
+import { initLogger, logNavigation } from './src/services/MobileLogger';
 import { saveConnectionHistory } from './src/utils/connectionStorage';
 
 type Screen = 'home' | 'connection' | 'sessions' | 'chat' | 'katex' | 'mermaid' | 'bash' | 'helper';
@@ -64,7 +65,8 @@ export default function App() {
       const data = await res.json();
       if (data.token) {
         setState(prev => ({ ...prev, connectedHost: host, token: data.token }));
-        // 保存 Token（PoC 阶段用内存）
+        // 初始化日志服务
+        initLogger(host, data.token);
       }
     } catch {
       // 配对失败时，尝试无 Token 模式
