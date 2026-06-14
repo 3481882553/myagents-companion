@@ -14,9 +14,10 @@ import { getConnectionHistory, saveConnectionHistory, ConnectionHistoryItem } fr
 interface ConnectionScreenProps {
   onConnected?: (host: string) => void;
   onBack?: () => void;
+  onScan?: () => void;
 }
 
-export function ConnectionScreen({ onConnected, onBack }: ConnectionScreenProps) {
+export function ConnectionScreen({ onConnected, onBack, onScan }: ConnectionScreenProps) {
   const [host, setHost] = useState('');
   const [port, setPort] = useState('32107');
   const [pairCode, setPairCode] = useState('');
@@ -167,10 +168,27 @@ export function ConnectionScreen({ onConnected, onBack }: ConnectionScreenProps)
         </>
       )}
 
-      {/* 扫码连接（预留） */}
-      <View style={styles.scanPlaceholder}>
-        <Text style={styles.scanPlaceholderText}>📷 扫码连接（W10 实现）</Text>
-      </View>
+      {/* 粘贴连接 */}
+      <TouchableOpacity style={styles.scanBtn} onPress={async () => {
+        try {
+          const Clipboard = require('@react-native-clipboard/clipboard');
+          const text = await Clipboard.default?.getString?.() || '';
+          if (text) {
+            // 尝试解析连接字符串：IP:PORT 或 IP:PORT:CODE
+            const parts = text.trim().split(':');
+            if (parts.length >= 2) {
+              setHost(parts[0]);
+              setPort(parts[1]);
+              if (parts.length >= 3) setPairCode(parts[2]);
+              Alert.alert('已粘贴', `地址: ${parts[0]}:${parts[1]}`);
+            }
+          }
+        } catch {
+          Alert.alert('提示', '请手动输入连接地址');
+        }
+      }}>
+        <Text style={styles.scanBtnText}>📋 粘贴连接地址</Text>
+      </TouchableOpacity>
     </View>
   );
 }

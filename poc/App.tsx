@@ -79,6 +79,9 @@ export default function App() {
     setScreen('chat');
   };
 
+  // 始终保持 SessionListScreen 挂载，避免滚动位置丢失
+  const isSessionVisible = screen === 'sessions' || screen === 'chat';
+
   const renderScreen = () => {
     switch (screen) {
       case 'connection':
@@ -86,25 +89,6 @@ export default function App() {
           <ConnectionScreen
             onBack={() => setScreen('home')}
             onConnected={handleConnected}
-          />
-        );
-      case 'sessions':
-        return (
-          <SessionListScreen
-            host={state.connectedHost || undefined}
-            token={state.token}
-            onSelect={handleSelectSession}
-            onBack={() => setScreen('home')}
-          />
-        );
-      case 'chat':
-        return (
-          <ChatScreen
-            sessionId={state.currentSessionId || 'unknown'}
-            host={state.connectedHost || undefined}
-            token={state.token}
-            onBack={() => setScreen('sessions')}
-            onSend={(msg) => console.log('Send:', msg)}
           />
         );
       case 'katex':
@@ -128,7 +112,32 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {renderScreen()}
+      {/* SessionListScreen 始终挂载，切换时只是隐藏 */}
+      <View style={{ flex: 1, display: isSessionVisible ? 'flex' : 'none' }}>
+        <SessionListScreen
+          host={state.connectedHost || undefined}
+          token={state.token}
+          onSelect={handleSelectSession}
+          onBack={() => setScreen('home')}
+          visible={screen === 'sessions'}
+        />
+      </View>
+
+      {/* ChatScreen 覆盖层 */}
+      {screen === 'chat' && (
+        <View style={{ flex: 1 }}>
+          <ChatScreen
+            sessionId={state.currentSessionId || 'unknown'}
+            host={state.connectedHost || undefined}
+            token={state.token}
+            onBack={() => setScreen('sessions')}
+            onSend={(msg) => console.log('Send:', msg)}
+          />
+        </View>
+      )}
+
+      {/* 其他页面 */}
+      {screen !== 'sessions' && screen !== 'chat' && renderScreen()}
     </SafeAreaView>
   );
 }

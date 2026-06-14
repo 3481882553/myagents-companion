@@ -93,7 +93,7 @@ export function SessionListScreen({ host, token, onSelect, onBack }: SessionList
           <Text style={styles.emptyText}>暂无会话</Text>
         </View>
       ) : (
-        <ScrollView style={styles.list}>
+        <ScrollView style={styles.list} maintainVisibleContentPosition={{ minIndexForVisible: 0 }}>
           {sessions.map((session) => (
             <TouchableOpacity
               key={session.id}
