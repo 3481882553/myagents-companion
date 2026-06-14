@@ -5,14 +5,102 @@
  */
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Platform } from 'react-native';
 import { MarkdownRenderer } from '../components/markdown/MarkdownRenderer';
+import { ToolCallRow, ToolCallInfo } from '../components/tools/ToolCallRow';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   createdAt: number;
+  tools?: ToolCallInfo[];
+}
+
+/** 从消息 content 中提取纯文本（支持嵌套 JSON） */
+function extractText(content: any): string {
+  if (!content) return '';
+
+  // 直接是字符串且不是 JSON
+  if (typeof content === 'string' && !content.startsWith('[') && !content.startsWith('{')) {
+    return content;
+  }
+
+  try {
+    const parsed = typeof content === 'string' ? JSON.parse(content) : content;
+
+    // 直接数组 [{"type":"text","text":"..."}, {"type":"tool_result","content":"..."}]
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((b: any) => {
+          if (b.type === 'text' && b.text) return b.text;
+          if (b.type === 'tool_result' && typeof b.content === 'string') return b.content;
+          if (b.type === 'tool_result' && Array.isArray(b.content)) {
+            return b.content.filter((c: any) => c.type === 'text' && c.text).map((c: any) => c.text).join('\n');
+          }
+          return '';
+        })
+        .filter(Boolean)
+        .join('\n');
+    }
+
+    // 嵌套对象 {"role":"user","content":"文本"} 或 {"role":"assistant","content":[...]}
+    if (parsed && typeof parsed === 'object' && parsed.content !== undefined) {
+      return extractText(parsed.content);
+    }
+  } catch {}
+  return typeof content === 'string' ? content : JSON.stringify(content);
+}
+
+/** 解析 assistant 消息的 content 为 text + tool_call 数组 */
+function parseAssistantContent(content: string): { text: string; tools: ToolCallInfo[] } {
+  try {
+    let blocks: any[] = [];
+
+    const parsed = JSON.parse(content);
+
+    // 情况1: 直接是数组 [{"type":"text","text":"..."}]
+    if (Array.isArray(parsed)) {
+      blocks = parsed;
+    }
+    // 情况2: 嵌套消息对象 {"id":...,"role":"assistant","content":[...]}
+    else if (parsed && typeof parsed === 'object' && Array.isArray(parsed.content)) {
+      blocks = parsed.content;
+    }
+    // 情况3: 嵌套且 content 是字符串
+    else if (parsed && typeof parsed === 'object' && typeof parsed.content === 'string') {
+      const inner = JSON.parse(parsed.content);
+      if (Array.isArray(inner)) blocks = inner;
+    }
+
+    if (blocks.length === 0) return { text: content, tools: [] };
+
+    let text = '';
+    const tools: ToolCallInfo[] = [];
+
+    for (const block of blocks) {
+      if (block.type === 'text' && block.text) {
+        text += block.text;
+      } else if (block.type === 'tool_use') {
+        tools.push({
+          name: block.name || 'Unknown',
+          input: typeof block.input === 'string' ? block.input : JSON.stringify(block.input || {}),
+          state: 'completed',
+        });
+      } else if (block.type === 'thinking' && block.thinking) {
+        // thinking 块也显示为工具调用行
+        tools.push({
+          name: 'Thinking',
+          input: block.thinking.slice(0, 500),
+          state: 'completed',
+        });
+      }
+    }
+
+    return { text: text.trim(), tools };
+  } catch {
+    return { text: content, tools: [] };
+  }
 }
 
 interface ChatScreenProps {
@@ -54,10 +142,15 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
       try {
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(`http://${host}/api/session/messages?sessionId=${sessionId}`, { headers });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const res = await fetch(`http://${host}/api/session/messages?sessionId=${sessionId}`, { headers, signal: controller.signal });
+        clearTimeout(timeoutId);
         const data = await res.json();
         if (data.messages && data.messages.length > 0) {
-          setDisplayMessages(data.messages);
+          // 只显示最近 50 条消息，避免大数据量导致卡顿
+          const recent = data.messages.slice(-50);
+          setDisplayMessages(recent);
         }
       } catch {
         // 静默失败
@@ -87,6 +180,8 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
     // 调用 Sidecar 发送 API
     if (host && token) {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
         await fetch(`http://${host}/api/session/send`, {
           method: 'POST',
           headers: {
@@ -94,14 +189,18 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
             'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({ sessionId, message: text }),
+          signal: controller.signal,
         });
-        // 发送成功后，AI 回复会通过 SSE 推送（W10+ 实现）
+        clearTimeout(timeoutId);
         // 暂时通过轮询获取最新消息
         setTimeout(async () => {
           try {
             const headers: Record<string, string> = {};
             if (token) headers['Authorization'] = `Bearer ${token}`;
-            const res = await fetch(`http://${host}/api/session/messages?sessionId=${sessionId}`, { headers });
+            const ctrl = new AbortController();
+            const tid = setTimeout(() => ctrl.abort(), 10000);
+            const res = await fetch(`http://${host}/api/session/messages?sessionId=${sessionId}`, { headers, signal: ctrl.signal });
+            clearTimeout(tid);
             const data = await res.json();
             if (data.messages && data.messages.length > 0) {
               setDisplayMessages(data.messages);
@@ -162,22 +261,41 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
             <Text style={styles.emptyText}>暂无消息</Text>
           </View>
         ) : (
-          filteredMessages.map((msg) => (
-            <View
-              key={msg.id}
-              testID={msg.role === 'user' ? 'user-message' : 'assistant-message'}
-              style={[
-                styles.messageBubble,
-                msg.role === 'user' ? styles.userBubble : styles.assistantBubble,
-              ]}
-            >
-              {msg.role === 'user' ? (
-                <Text style={styles.userText}>{msg.content}</Text>
-              ) : (
-                <MarkdownRenderer content={msg.content} />
-              )}
-            </View>
-          ))
+          filteredMessages.map((msg) => {
+            try {
+              // 后端已返回结构化数据，直接使用
+              const msgTools = msg.tools || [];
+
+              if (msg.role === 'user') {
+                return (
+                  <View key={msg.id} testID="user-message" style={[styles.messageBubble, styles.userBubble]}>
+                    <MarkdownRenderer content={msg.content} />
+                  </View>
+                );
+              }
+
+              // assistant 消息
+              return (
+                <View key={msg.id} testID="assistant-message" style={styles.assistantBubble}>
+                  {msg.content ? <MarkdownRenderer content={msg.content} /> : null}
+                  {msgTools.length > 0 && !msg.content && (
+                    <Text style={{ fontSize: 13, color: '#968a7e', fontStyle: 'italic' }}>
+                      🤔 思考中...
+                    </Text>
+                  )}
+                  {msgTools.map((tool: ToolCallInfo, i: number) => (
+                    <ToolCallRow key={`tool-${i}`} tool={tool} />
+                  ))}
+                </View>
+              );
+            } catch (e) {
+              return (
+                <View key={msg.id} style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
+                  <Text style={{ fontSize: 13, color: '#1c1612' }}>{msg.content.slice(0, 500)}</Text>
+                </View>
+              );
+            }
+          })
         )}
       </ScrollView>
 

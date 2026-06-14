@@ -1,12 +1,12 @@
 /**
- * MarkdownRenderer — Markdown 渲染组件
+ * MarkdownRenderer — 基于 react-native-markdown-display 的完整 Markdown 渲染
  *
- * 功能：渲染 Markdown 内容，支持 GFM 扩展
- * 依赖：react-native-markdown-display
+ * 支持：GFM 表格、任务列表、删除线、行内代码、代码块
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Linking, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Linking } from 'react-native';
+import Markdown from 'react-native-markdown-display';
 import { lightTokens, darkTokens, ThemeTokens } from '../../theme/tokens';
 
 interface MarkdownRendererProps {
@@ -19,96 +19,79 @@ export function MarkdownRenderer({ content, theme = 'light' }: MarkdownRendererP
 
   if (!content) return null;
 
-  // 简单的 Markdown 渲染（PoC 阶段）
-  // 正式版使用 react-native-markdown-display
-  const renderLine = (line: string, index: number) => {
-    // 标题
-    if (line.startsWith('# ')) {
-      return <Text key={index} style={[styles.h1, { color: tokens.ink }]}>{line.slice(2)}</Text>;
-    }
-    if (line.startsWith('## ')) {
-      return <Text key={index} style={[styles.h2, { color: tokens.ink }]}>{line.slice(3)}</Text>;
-    }
-    if (line.startsWith('### ')) {
-      return <Text key={index} style={[styles.h3, { color: tokens.ink }]}>{line.slice(4)}</Text>;
-    }
-
-    // 列表
-    if (line.startsWith('- ')) {
-      return <Text key={index} style={[styles.listItem, { color: tokens.ink }]}>• {line.slice(2)}</Text>;
-    }
-
-    // 引用
-    if (line.startsWith('> ')) {
-      return (
-        <View key={index} style={[styles.quote, { borderLeftColor: tokens.accentWarm }]}>
-          <Text style={[styles.quoteText, { color: tokens.inkMuted }]}>{line.slice(2)}</Text>
-        </View>
-      );
-    }
-
-    // 空行
-    if (line.trim() === '') {
-      return <View key={index} style={styles.emptyLine} />;
-    }
-
-    // 普通文本（处理行内格式）
-    return <Text key={index} style={[styles.paragraph, { color: tokens.ink }]}>{line}</Text>;
+  const markdownStyles = {
+    body: { color: tokens.ink, fontSize: 15, lineHeight: 22 },
+    heading1: { fontSize: 22, fontWeight: '700' as const, marginTop: 12, marginBottom: 8 },
+    heading2: { fontSize: 19, fontWeight: '600' as const, marginTop: 10, marginBottom: 6 },
+    heading3: { fontSize: 17, fontWeight: '600' as const, marginTop: 8, marginBottom: 4 },
+    paragraph: { marginTop: 4, marginBottom: 4 },
+    link: { color: tokens.accentWarm, textDecorationLine: 'underline' as const },
+    blockquote: {
+      borderLeftWidth: 3,
+      borderLeftColor: tokens.accentWarm,
+      paddingLeft: 12,
+      marginVertical: 4,
+    },
+    list_item: { marginVertical: 2 },
+    bullet_list: { paddingLeft: 16 },
+    ordered_list: { paddingLeft: 16 },
+    code_inline: {
+      backgroundColor: 'rgba(28, 22, 18, 0.06)',
+      color: tokens.accentWarm,
+      fontSize: 13,
+      fontFamily: 'monospace',
+      paddingHorizontal: 4,
+      borderRadius: 3,
+    },
+    code_block: {
+      backgroundColor: 'rgba(28, 22, 18, 0.06)',
+      fontFamily: 'monospace',
+      fontSize: 13,
+      lineHeight: 18,
+      padding: 12,
+      borderRadius: 6,
+      marginVertical: 8,
+      overflow: 'scroll' as const,
+    },
+    fence: {
+      backgroundColor: 'rgba(28, 22, 18, 0.06)',
+      fontFamily: 'monospace',
+      fontSize: 13,
+      lineHeight: 18,
+      padding: 12,
+      borderRadius: 6,
+      marginVertical: 8,
+    },
+    table: {
+      borderWidth: 1,
+      borderColor: 'rgba(28, 22, 18, 0.10)',
+      borderRadius: 6,
+      marginVertical: 8,
+    },
+    th: {
+      backgroundColor: 'rgba(28, 22, 18, 0.04)',
+      padding: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(28, 22, 18, 0.10)',
+    },
+    td: {
+      padding: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(28, 22, 18, 0.06)',
+    },
+    hr: {
+      backgroundColor: 'rgba(28, 22, 18, 0.10)',
+      height: 1,
+      marginVertical: 12,
+    },
+    strong: { fontWeight: '700' as const },
+    em: { fontStyle: 'italic' as const },
+    del: { textDecorationLine: 'line-through' as const },
   };
 
-  const lines = content.split('\n');
-
   return (
-    <View style={styles.container}>
-      {lines.map((line, index) => renderLine(line, index))}
-    </View>
+    <Markdown style={markdownStyles}>
+      {content}
+    </Markdown>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    paddingVertical: 4,
-  },
-  h1: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  h2: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 6,
-    marginTop: 12,
-  },
-  h3: {
-    fontSize: 17,
-    fontWeight: '600',
-    marginBottom: 4,
-    marginTop: 8,
-  },
-  paragraph: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 4,
-  },
-  listItem: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 2,
-    paddingLeft: 16,
-  },
-  quote: {
-    borderLeftWidth: 3,
-    paddingLeft: 12,
-    marginVertical: 4,
-  },
-  quoteText: {
-    fontSize: 15,
-    lineHeight: 22,
-    fontStyle: 'italic',
-  },
-  emptyLine: {
-    height: 8,
-  },
-});
