@@ -29,6 +29,8 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
   const [displayMessages, setDisplayMessages] = useState<Message[]>(messages);
   const [loading, setLoading] = useState(!!host);
   const scrollViewRef = useRef<any>(null);
+  const hasScrolledToBottom = useRef(false);
+  const messageCountRef = useRef(0);
 
   // 过滤掉工具调用消息（content 为空或 system 消息）
   const filteredMessages = useMemo(() => {
@@ -67,26 +69,56 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
     loadMessages();
   }, [sessionId, host, token, messages]);
 
-  const handleSend = () => {
-    if (!inputText.trim() || !onSend) return;
+  const handleSend = async () => {
+    if (!inputText.trim()) return;
 
+    const text = inputText.trim();
     const userMessage: Message = {
       id: `user_${Date.now()}`,
       role: 'user',
-      content: inputText.trim(),
+      content: text,
       createdAt: Date.now(),
     };
 
+    // 立即显示用户消息
     setDisplayMessages(prev => [...prev, userMessage]);
-    onSend(inputText.trim());
     setInputText('');
+
+    // 调用 Sidecar 发送 API
+    if (host && token) {
+      try {
+        await fetch(`http://${host}/api/session/send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ sessionId, message: text }),
+        });
+        // 发送成功后，AI 回复会通过 SSE 推送（W10+ 实现）
+        // 暂时通过轮询获取最新消息
+        setTimeout(async () => {
+          try {
+            const headers: Record<string, string> = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const res = await fetch(`http://${host}/api/session/messages?sessionId=${sessionId}`, { headers });
+            const data = await res.json();
+            if (data.messages && data.messages.length > 0) {
+              setDisplayMessages(data.messages);
+            }
+          } catch {}
+        }, 3000); // 3秒后轮询一次
+      } catch {
+        // 发送失败时保留用户消息
+      }
+    }
+
+    // 调用外部回调（如果有）
+    onSend?.(text);
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.container}>
       {/* 标题栏 */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack}>
@@ -100,6 +132,30 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
         ref={scrollViewRef}
         style={styles.messageList}
         contentContainerStyle={styles.messageListContent}
+        onContentSizeChange={(w, h) => {
+          if (filteredMessages.length === 0) return;
+
+          const prevCount = messageCountRef.current;
+          const newCount = filteredMessages.length;
+          messageCountRef.current = newCount;
+
+          if (!hasScrolledToBottom.current) {
+            // 首次加载：等布局稳定后直接跳到底部（无动画）
+            // 多次尝试确保生效
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: false });
+              hasScrolledToBottom.current = true;
+            }, 50);
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: false });
+            }, 200);
+          } else if (newCount > prevCount) {
+            // 新消息到来：平滑滚动到底部
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 50);
+          }
+        }}
       >
         {filteredMessages.length === 0 ? (
           <View style={styles.emptyState}>
@@ -148,7 +204,7 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
           </TouchableOpacity>
         </View>
       )}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -180,6 +236,9 @@ const styles = StyleSheet.create({
   },
   messageListContent: {
     padding: 16,
+    paddingBottom: 8,
+    flexGrow: 1,
+    justifyContent: 'flex-end',
   },
   emptyState: {
     flex: 1,
@@ -224,6 +283,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(28, 22, 18, 0.10)',
     backgroundColor: '#fffcf7',
+    minHeight: 56,
   },
   input: {
     flex: 1,

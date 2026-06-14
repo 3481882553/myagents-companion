@@ -7,8 +7,9 @@
  * - 连接/断开操作
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { getConnectionHistory, saveConnectionHistory, ConnectionHistoryItem } from '../utils/connectionStorage';
 
 interface ConnectionScreenProps {
   onConnected?: (host: string) => void;
@@ -17,24 +18,22 @@ interface ConnectionScreenProps {
 
 export function ConnectionScreen({ onConnected, onBack }: ConnectionScreenProps) {
   const [host, setHost] = useState('');
-  const [port, setPort] = useState('32101');
+  const [port, setPort] = useState('32107');
   const [pairCode, setPairCode] = useState('');
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [error, setError] = useState('');
+  const [history, setHistory] = useState<ConnectionHistoryItem[]>([]);
 
-  const handleConnect = async () => {
-    if (!host.trim()) {
-      Alert.alert('错误', '请输入桌面端 IP 地址');
-      return;
-    }
+  // 加载连接历史
+  useEffect(() => {
+    getConnectionHistory().then(setHistory);
+  }, []);
 
+  const doConnect = async (fullHost: string, code: string) => {
     setStatus('connecting');
     setError('');
 
     try {
-      const fullHost = `${host.trim()}:${port}`;
-
-      // 健康检查（带超时）
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -47,6 +46,10 @@ export function ConnectionScreen({ onConnected, onBack }: ConnectionScreenProps)
 
         if (response.ok) {
           setStatus('connected');
+          await saveConnectionHistory(fullHost, code);
+          // 刷新历史列表
+          const updated = await getConnectionHistory();
+          setHistory(updated);
           onConnected?.(fullHost);
         } else {
           throw new Error('连接失败');
@@ -62,6 +65,18 @@ export function ConnectionScreen({ onConnected, onBack }: ConnectionScreenProps)
       setStatus('error');
       setError(err.message || '连接失败');
     }
+  };
+
+  const handleConnect = () => {
+    if (!host.trim()) {
+      Alert.alert('错误', '请输入桌面端 IP 地址');
+      return;
+    }
+    doConnect(`${host.trim()}:${port}`, pairCode || '123456');
+  };
+
+  const handleHistoryPress = (item: ConnectionHistoryItem) => {
+    doConnect(item.host, item.pairCode);
   };
 
   return (
@@ -134,6 +149,23 @@ export function ConnectionScreen({ onConnected, onBack }: ConnectionScreenProps)
           {status === 'connecting' ? '连接中...' : '连接'}
         </Text>
       </TouchableOpacity>
+
+      {/* 连接历史 */}
+      {history.length > 0 && (
+        <>
+          <Text style={styles.historyTitle}>最近连接</Text>
+          {history.map((item) => (
+            <TouchableOpacity
+              key={item.host}
+              style={styles.historyItem}
+              onPress={() => handleHistoryPress(item)}
+            >
+              <Text style={styles.historyHost}>{item.host}</Text>
+              <Text style={styles.historyHint}>点击连接</Text>
+            </TouchableOpacity>
+          ))}
+        </>
+      )}
 
       {/* 扫码连接（预留） */}
       <View style={styles.scanPlaceholder}>
@@ -242,5 +274,31 @@ const styles = StyleSheet.create({
   scanPlaceholderText: {
     fontSize: 14,
     color: '#968a7e',
+  },
+  historyTitle: {
+    fontSize: 13,
+    color: '#6f6156',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fffcf7',
+    borderWidth: 1,
+    borderColor: 'rgba(28, 22, 18, 0.10)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 6,
+  },
+  historyHost: {
+    fontSize: 15,
+    color: '#1c1612',
+    fontWeight: '500',
+  },
+  historyHint: {
+    fontSize: 12,
+    color: '#c26d3a',
   },
 });

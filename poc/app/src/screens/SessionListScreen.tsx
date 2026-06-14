@@ -59,7 +59,9 @@ export function SessionListScreen({ host, token, onSelect, onBack }: SessionList
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const data = await response.json();
-      setSessions(data.sessions || []);
+      // 按最后消息时间倒序排列（最新的在上面）
+      const sorted = (data.sessions || []).sort((a: Session, b: Session) => b.lastMessageAt - a.lastMessageAt);
+      setSessions(sorted);
     } catch (err: any) {
       setError(err.message || '加载失败');
     } finally {
