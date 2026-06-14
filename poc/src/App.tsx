@@ -1,40 +1,103 @@
 /**
  * MyAgents Companion PoC — App 入口
  *
- * W1：WebView 渲染 PoC
- * W2：通信层 PoC
- * W3：端到端 Spike
+ * W1-W9: PoC + 通信 + 认证 + 渲染 + Sidecar
+ * W10: 深度链接 + IM 集成
  */
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, BackHandler } from 'react-native';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ConnectionScreen } from './src/screens/ConnectionScreen';
+import { SessionListScreen } from './src/screens/SessionListScreen';
+import { ChatScreen, Message } from './src/screens/ChatScreen';
 import { KaTeXDemo } from './src/components/KaTeXDemo';
 import { MermaidDemo } from './src/components/MermaidDemo';
 import { BashToolDemo } from './src/components/BashToolDemo';
 
-type Screen = 'home' | 'connection' | 'katex' | 'mermaid' | 'bash' | 'helper';
+type Screen = 'home' | 'connection' | 'sessions' | 'chat' | 'katex' | 'mermaid' | 'bash' | 'helper';
+
+interface AppState {
+  connectedHost: string | null;
+  token: string | null;
+  currentSessionId: string | null;
+}
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
+  const [state, setState] = useState<AppState>({
+    connectedHost: null,
+    currentSessionId: null,
+  });
 
   // Android 返回键处理
   useEffect(() => {
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (screen === 'chat') {
+        setScreen('sessions');
+        return true;
+      }
       if (screen !== 'home') {
         setScreen('home');
-        return true; // 已处理
+        return true;
       }
-      return false; // 交给系统处理（退出 App）
+      return false;
     });
     return () => handler.remove();
   }, [screen]);
 
+  const handleConnected = async (host: string) => {
+    try {
+      // 配对获取 Token
+      const res = await fetch(`http://${host}/api/pair`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: '123456' }),
+      });
+      const data = await res.json();
+      if (data.token) {
+        setState(prev => ({ ...prev, connectedHost: host, token: data.token }));
+      }
+    } catch {
+      // 配对失败时，尝试无 Token 模式
+      setState(prev => ({ ...prev, connectedHost: host }));
+    }
+    setScreen('sessions');
+  };
+
+  const handleSelectSession = (sessionId: string) => {
+    setState(prev => ({ ...prev, currentSessionId: sessionId }));
+    setScreen('chat');
+  };
+
   const renderScreen = () => {
     switch (screen) {
       case 'connection':
-        return <ConnectionScreen onBack={() => setScreen('home')} />;
+        return (
+          <ConnectionScreen
+            onBack={() => setScreen('home')}
+            onConnected={handleConnected}
+          />
+        );
+      case 'sessions':
+        return (
+          <SessionListScreen
+            host={state.connectedHost || undefined}
+            token={state.token}
+            onSelect={handleSelectSession}
+            onBack={() => setScreen('home')}
+          />
+        );
+      case 'chat':
+        return (
+          <ChatScreen
+            sessionId={state.currentSessionId || 'unknown'}
+            host={state.connectedHost || undefined}
+            token={state.token}
+            onBack={() => setScreen('sessions')}
+            onSend={(msg) => console.log('Send:', msg)}
+          />
+        );
       case 'katex':
         return <KaTeXDemo />;
       case 'mermaid':
@@ -63,14 +126,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#faf6ee',
-  },
-  backBtn: {
-    padding: 12,
-    paddingLeft: 16,
-  },
-  backText: {
-    fontSize: 15,
-    color: '#c26d3a',
   },
   placeholder: {
     flex: 1,

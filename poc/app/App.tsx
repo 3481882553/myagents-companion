@@ -10,7 +10,7 @@ import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, BackHandler } f
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ConnectionScreen } from './src/screens/ConnectionScreen';
 import { SessionListScreen } from './src/screens/SessionListScreen';
-import { ChatScreen } from './src/screens/ChatScreen';
+import { ChatScreen, Message } from './src/screens/ChatScreen';
 import { KaTeXDemo } from './src/components/KaTeXDemo';
 import { MermaidDemo } from './src/components/MermaidDemo';
 import { BashToolDemo } from './src/components/BashToolDemo';
@@ -19,6 +19,7 @@ type Screen = 'home' | 'connection' | 'sessions' | 'chat' | 'katex' | 'mermaid' 
 
 interface AppState {
   connectedHost: string | null;
+  token: string | null;
   currentSessionId: string | null;
 }
 
@@ -45,8 +46,22 @@ export default function App() {
     return () => handler.remove();
   }, [screen]);
 
-  const handleConnected = (host: string) => {
-    setState(prev => ({ ...prev, connectedHost: host }));
+  const handleConnected = async (host: string) => {
+    try {
+      // 配对获取 Token
+      const res = await fetch(`http://${host}/api/pair`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: '123456' }),
+      });
+      const data = await res.json();
+      if (data.token) {
+        setState(prev => ({ ...prev, connectedHost: host, token: data.token }));
+      }
+    } catch {
+      // 配对失败时，尝试无 Token 模式
+      setState(prev => ({ ...prev, connectedHost: host }));
+    }
     setScreen('sessions');
   };
 
@@ -68,6 +83,7 @@ export default function App() {
         return (
           <SessionListScreen
             host={state.connectedHost || undefined}
+            token={state.token}
             onSelect={handleSelectSession}
             onBack={() => setScreen('home')}
           />
@@ -76,6 +92,8 @@ export default function App() {
         return (
           <ChatScreen
             sessionId={state.currentSessionId || 'unknown'}
+            host={state.connectedHost || undefined}
+            token={state.token}
             onBack={() => setScreen('sessions')}
             onSend={(msg) => console.log('Send:', msg)}
           />
