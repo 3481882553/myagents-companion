@@ -44,18 +44,10 @@ describe('SessionListScreen', () => {
   });
 
   it('创建组件不崩溃', () => {
+    const mockNavigation = { navigate: jest.fn(), goBack: jest.fn(), addListener: jest.fn() };
     const result = SessionListScreen({
-      onSelect: mockOnSelect,
-      onBack: mockOnBack,
-    });
-    expect(result).toBeTruthy();
-  });
-
-  it('带 host 参数创建不崩溃', () => {
-    const result = SessionListScreen({
-      host: '192.168.1.5:32102',
-      onSelect: mockOnSelect,
-      onBack: mockOnBack,
+      navigation: mockNavigation as any,
+      route: { key: 'test', name: 'SessionList' } as any,
     });
     expect(result).toBeTruthy();
   });

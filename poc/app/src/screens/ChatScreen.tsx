@@ -6,16 +6,13 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Platform } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import { MarkdownRenderer } from '../components/markdown/MarkdownRenderer';
 import { ToolCallRow, ToolCallInfo } from '../components/tools/ToolCallRow';
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  createdAt: number;
-  tools?: ToolCallInfo[];
-}
+import { useConnectionStore } from '../store/connectionStore';
+import { useMessageStore } from '../store/messageStore';
+import type { Message } from '../types/message';
 
 /** 从消息 content 中提取纯文本（支持嵌套 JSON） */
 function extractText(content: any): string {
@@ -103,32 +100,24 @@ function parseAssistantContent(content: string): { text: string; tools: ToolCall
   }
 }
 
-interface ChatScreenProps {
-  sessionId: string;
-  host?: string;
-  token?: string | null;
-  messages?: Message[];
-  onSend?: (message: string) => void;
-  onBack?: () => void;
-}
+type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 
 const TAG = '[ChatScreen]';
 
-export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBack }: ChatScreenProps) {
+export function ChatScreen({ route, navigation }: Props) {
+  const { sessionId } = route.params;
   const [inputText, setInputText] = useState('');
-  const [displayMessages, setDisplayMessages] = useState<Message[]>(messages);
-  const [loading, setLoading] = useState(!!host);
+  const [displayMessages, setDisplayMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef<any>(null);
   const hasScrolledToBottom = useRef(false);
   const messageCountRef = useRef(0);
 
-  const { host: storeHost, token: storeToken } = useConnectionStore();
+  const { host, token } = useConnectionStore();
   const { loadMessagesFromApi, sendMessage, loadMessages } = useMessageStore();
-  const effectiveHost = host || storeHost;
-  const effectiveToken = token || storeToken;
 
   useEffect(() => {
-    console.log(TAG, '屏幕已挂载, sessionId:', sessionId, 'host:', effectiveHost || '(未设置)');
+    console.log(TAG, '屏幕已挂载, sessionId:', sessionId, 'host:', host || '(未设置)');
     return () => console.log(TAG, '屏幕将卸载, sessionId:', sessionId);
   }, [sessionId]);
 
@@ -144,15 +133,15 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
 
   // 加载消息
   useEffect(() => {
-    if (!effectiveHost) {
-      setDisplayMessages(messages);
+    if (!host) {
+      setDisplayMessages([]);
       setLoading(false);
       return;
     }
 
     const loadMsgs = async () => {
       try {
-        const msgs = await loadMessagesFromApi(sessionId, effectiveHost, effectiveToken || '');
+        const msgs = await loadMessagesFromApi(sessionId, host, token || '');
         setDisplayMessages(msgs);
       } catch {
         // 静默失败
@@ -162,7 +151,7 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
     };
 
     loadMsgs();
-  }, [sessionId, effectiveHost, effectiveToken]);
+  }, [sessionId, host, token]);
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
@@ -172,9 +161,11 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
 
     const userMessage: Message = {
       id: `user_${Date.now()}`,
+      sessionId,
       role: 'user',
       content: text,
       createdAt: Date.now(),
+      status: 'sent',
     };
 
     // 立即显示用户消息
@@ -183,15 +174,15 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
     console.log(TAG, '用户消息已添加到本地:', userMessage.id);
 
     // 使用 messageStore 发送消息
-    if (effectiveHost && effectiveToken) {
+    if (host && token) {
       try {
         console.log(TAG, '发送到 Sidecar...');
-        await sendMessage(sessionId, text, effectiveHost, effectiveToken);
+        await sendMessage(sessionId, text, host, token);
         console.log(TAG, '发送成功, 等待回复...');
         // 轮询获取最新消息
         setTimeout(async () => {
           try {
-            const msgs = await loadMessagesFromApi(sessionId, effectiveHost, effectiveToken);
+            const msgs = await loadMessagesFromApi(sessionId, host, token);
             console.log(TAG, '轮询获取到', msgs.length, '条消息');
             setDisplayMessages(msgs);
           } catch (err: any) {
@@ -205,15 +196,14 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
       console.warn(TAG, '未连接, 消息仅保存在本地');
     }
 
-    // 调用外部回调（如果有）
-    onSend?.(text);
+    // 消息已通过 store 发送
   };
 
   return (
     <View style={styles.container}>
       {/* 标题栏 */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backBtn}>← 返回</Text>
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>会话 {sessionId.slice(0, 8)}</Text>
@@ -257,7 +247,7 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
           filteredMessages.map((msg) => {
             try {
               // 后端已返回结构化数据，直接使用
-              const msgTools = msg.tools || [];
+              const msgTools = (msg.toolCalls || []) as ToolCallInfo[];
 
               if (msg.role === 'user') {
                 return (
@@ -293,8 +283,7 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
       </ScrollView>
 
       {/* 输入框 */}
-      {onSend && (
-        <View style={styles.inputBar}>
+      <View style={styles.inputBar}>
           <TextInput
             style={styles.input}
             placeholder="输入消息..."
@@ -314,7 +303,6 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
             <Text style={styles.sendBtnText}>发送</Text>
           </TouchableOpacity>
         </View>
-      )}
     </View>
   );
 }

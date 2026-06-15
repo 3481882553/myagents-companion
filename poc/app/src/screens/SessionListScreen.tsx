@@ -6,19 +6,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useConnectionStore } from '../store/connectionStore';
 import { useSessionStore } from '../store/sessionStore';
 import { ApiService } from '../services/ApiService';
 
 const TAG = '[SessionListScreen]';
-
-interface SessionListScreenProps {
-  host?: string;
-  token?: string | null;
-  onSelect?: (sessionId: string) => void;
-  onBack?: () => void;
-  visible?: boolean;
-}
+type Props = NativeStackScreenProps<RootStackParamList, 'SessionList'>;
 
 function formatTime(timestamp: number): string {
   const now = Date.now();
@@ -31,11 +26,11 @@ function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString('zh-CN');
 }
 
-export function SessionListScreen({ host, token, onSelect, onBack, visible }: SessionListScreenProps) {
+export function SessionListScreen({ navigation }: Props) {
   const { host: storeHost, token: storeToken } = useConnectionStore();
   const { sessions, setSessions, loading, setLoading, error, setError } = useSessionStore();
-  const effectiveHost = host || storeHost;
-  const effectiveToken = token || storeToken;
+  const effectiveHost = storeHost;
+  const effectiveToken = storeToken;
 
   useEffect(() => {
     console.log(TAG, '屏幕已挂载, host:', effectiveHost || '(未设置)');
@@ -96,7 +91,7 @@ export function SessionListScreen({ host, token, onSelect, onBack, visible }: Se
               style={styles.sessionCard}
               onPress={() => {
                 console.log(TAG, '选中会话:', session.id, session.title);
-                onSelect?.(session.id);
+                navigation.navigate('Chat', { sessionId: session.id });
               }}
             >
               <Text style={styles.sessionTitle} numberOfLines={1}>{session.title}</Text>

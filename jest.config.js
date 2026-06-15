@@ -41,5 +41,7 @@ module.exports = {
     '^@react-native-clipboard/clipboard$': '<rootDir>/poc/app/src/__tests__/mocks/clipboard.js',
     '^@react-native-async-storage/async-storage$': '<rootDir>/poc/app/src/__tests__/mocks/async-storage.js',
     '^test-renderer$': '<rootDir>/node_modules/react-test-renderer',
+    '^@react-navigation/native$': '<rootDir>/poc/app/src/__tests__/mocks/react-navigation.js',
+    '^@react-navigation/native-stack$': '<rootDir>/poc/app/src/__tests__/mocks/react-navigation.js',
   },
 };

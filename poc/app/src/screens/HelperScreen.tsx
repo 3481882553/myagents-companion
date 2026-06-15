@@ -8,19 +8,16 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import { MarkdownRenderer } from '../components/markdown/MarkdownRenderer';
+import { useConnectionStore } from '../store/connectionStore';
 
 interface HelperMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
-}
-
-interface HelperScreenProps {
-  host?: string;
-  token?: string | null;
-  onBack?: () => void;
 }
 
 const QUICK_ACTIONS = [
@@ -33,8 +30,10 @@ const QUICK_ACTIONS = [
 ];
 
 const TAG = '[HelperScreen]';
+type Props = NativeStackScreenProps<RootStackParamList, 'Helper'>;
 
-export function HelperScreen({ host, token, onBack }: HelperScreenProps) {
+export function HelperScreen({ navigation }: Props) {
+  const { host, token } = useConnectionStore();
   const [messages, setMessages] = useState<HelperMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -210,7 +209,7 @@ export function HelperScreen({ host, token, onBack }: HelperScreenProps) {
     <View style={styles.container}>
       {/* 标题栏 */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backBtn}>← 返回</Text>
         </TouchableOpacity>
         <Text style={styles.title}>🤖 小助理</Text>

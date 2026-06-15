@@ -6,6 +6,7 @@
 import type { ConnectionConfig } from '../types/connection';
 import type { Session } from '../types/session';
 import type { Message, ToolCall } from '../types/message';
+import { filterUserSessions } from '../utils/sessionFilter';
 
 export class ApiService {
   private baseUrl: string;
@@ -38,9 +39,8 @@ export class ApiService {
 
   async getSessionList(): Promise<Session[]> {
     const data = await this.get<{ sessions: any[] }>('/api/session/list');
-    return data.sessions
-      .filter((s: any) => !s.internal && !s.cronTaskId)
-      .map((s: any) => this.normalizeSession(s));
+    const all = data.sessions.map((s: any) => this.normalizeSession(s));
+    return filterUserSessions(all);
   }
 
   // 别名：兼容旧调用

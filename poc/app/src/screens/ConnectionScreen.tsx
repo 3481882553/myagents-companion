@@ -9,18 +9,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useConnectionStore } from '../store/connectionStore';
-import { ApiService } from '../services/ApiService';
 import { getConnectionHistory, saveConnectionHistory, ConnectionHistoryItem } from '../utils/connectionStorage';
-
-interface ConnectionScreenProps {
-  onConnected?: (host: string, token?: string) => void;
-  onBack?: () => void;
-}
+import { StorageService } from '../services/StorageService';
 
 const TAG = '[ConnectionScreen]';
+type Props = NativeStackScreenProps<RootStackParamList, 'Connection'>;
 
-export function ConnectionScreen({ onConnected, onBack }: ConnectionScreenProps) {
+export function ConnectionScreen({ navigation }: Props) {
   const [host, setHost] = useState('');
   const [port, setPort] = useState('32107');
   const [pairCode, setPairCode] = useState('');
@@ -49,7 +47,16 @@ export function ConnectionScreen({ onConnected, onBack }: ConnectionScreenProps)
       setHistory(await getConnectionHistory());
       const token = useConnectionStore.getState().token;
       console.log(TAG, '连接成功, token:', token ? `${token.slice(0, 4)}...` : null);
-      onConnected?.(fullHost, token || undefined);
+
+      // 持久化连接配置
+      if (token) {
+        StorageService.saveConnection({ host: h, port: parseInt(p) || 32107, token });
+        StorageService.saveToken(token);
+        console.log(TAG, '连接配置已持久化');
+      }
+
+      console.log(TAG, '跳转到会话列表');
+      navigation.navigate('SessionList');
     } catch (err: any) {
       console.error(TAG, '连接失败:', err?.message || err);
       setStatus('error');
@@ -73,7 +80,7 @@ export function ConnectionScreen({ onConnected, onBack }: ConnectionScreenProps)
     <View style={styles.container}>
       {/* 标题栏 */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backBtn}>← 返回</Text>
         </TouchableOpacity>
         <Text style={styles.title}>连接桌面端</Text>

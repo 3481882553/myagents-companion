@@ -23,6 +23,9 @@ export type RootStackParamList = {
   SessionList: undefined;
   Chat: { sessionId: string };
   Helper: undefined;
+  KaTeX: undefined;
+  Mermaid: undefined;
+  Bash: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

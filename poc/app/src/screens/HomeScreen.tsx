@@ -10,15 +10,14 @@
 
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useConnectionStore } from '../store/connectionStore';
 
 const TAG = '[HomeScreen]';
+type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-interface HomeScreenProps {
-  onNavigate: (screen: string) => void;
-}
-
-export function HomeScreen({ onNavigate }: HomeScreenProps) {
+export function HomeScreen({ navigation }: Props) {
   const { status, host } = useConnectionStore();
   const isConnected = status === 'connected';
 
