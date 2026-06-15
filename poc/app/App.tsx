@@ -1,12 +1,12 @@
 /**
  * MyAgents Companion PoC — App 入口
  *
- * W1-W9: PoC + 通信 + 认证 + 渲染 + Sidecar
- * W10: 深度链接 + IM 集成
+ * v0.2 架构升级 — 增加全链路调试日志
  */
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, BackHandler } from 'react-native';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ConnectionScreen } from './src/screens/ConnectionScreen';
 import { SessionListScreen } from './src/screens/SessionListScreen';
@@ -17,6 +17,8 @@ import { BashToolDemo } from './src/components/BashToolDemo';
 import { HelperScreen } from './src/screens/HelperScreen';
 import { initLogger, logNavigation } from './src/services/MobileLogger';
 import { saveConnectionHistory } from './src/utils/connectionStorage';
+
+const TAG = '[App]';
 
 type Screen = 'home' | 'connection' | 'sessions' | 'chat' | 'katex' | 'mermaid' | 'bash' | 'helper';
 
@@ -30,22 +32,26 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [state, setState] = useState<AppState>({
     connectedHost: null,
+    token: null,
     currentSessionId: null,
   });
 
-  // 启动时尝试恢复上次的 Token
   useEffect(() => {
-    // 不自动跳转，让用户从连接历史中选择
+    console.log(TAG, 'App 已挂载');
+    return () => console.log(TAG, 'App 将卸载');
   }, []);
 
   // Android 返回键处理
   useEffect(() => {
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      console.log(TAG, '返回键, 当前页面:', screen);
       if (screen === 'chat') {
+        console.log(TAG, '返回: chat -> sessions');
         setScreen('sessions');
         return true;
       }
       if (screen !== 'home') {
+        console.log(TAG, '返回:', screen, '-> home');
         setScreen('home');
         return true;
       }
@@ -54,30 +60,24 @@ export default function App() {
     return () => handler.remove();
   }, [screen]);
 
-  const handleConnected = async (host: string) => {
-    try {
-      // 配对获取 Token
-      const res = await fetch(`http://${host}/api/pair`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: '123456' }),
-      });
-      const data = await res.json();
-      if (data.token) {
-        setState(prev => ({ ...prev, connectedHost: host, token: data.token }));
-        // 初始化日志服务
-        initLogger(host, data.token);
-      }
-    } catch {
-      // 配对失败时，尝试无 Token 模式
-      setState(prev => ({ ...prev, connectedHost: host }));
+  const handleScreenChange = (newScreen: Screen) => {
+    console.log(TAG, '页面切换:', screen, '->', newScreen);
+    setScreen(newScreen);
+  };
+
+  const handleConnected = async (host: string, token?: string) => {
+    console.log(TAG, 'handleConnected:', { host, token: token ? `${token.slice(0, 4)}...` : null });
+    setState(prev => ({ ...prev, connectedHost: host, token: token || null }));
+    if (token) {
+      initLogger(host, token);
     }
+    console.log(TAG, '连接成功, 跳转到会话列表');
     setScreen('sessions');
   };
 
   const handleSelectSession = (sessionId: string) => {
+    console.log(TAG, '选中会话:', sessionId);
     setState(prev => ({ ...prev, currentSessionId: sessionId }));
-    // PoC 阶段不需要保存最后会话
     setScreen('chat');
   };
 
@@ -89,7 +89,7 @@ export default function App() {
       case 'connection':
         return (
           <ConnectionScreen
-            onBack={() => setScreen('home')}
+            onBack={() => handleScreenChange('home')}
             onConnected={handleConnected}
           />
         );
@@ -104,15 +104,18 @@ export default function App() {
           <HelperScreen
             host={state.connectedHost || undefined}
             token={state.token}
-            onBack={() => setScreen('home')}
+            onBack={() => handleScreenChange('home')}
           />
         );
       default:
-        return <HomeScreen onNavigate={setScreen} />;
+        return <HomeScreen onNavigate={handleScreenChange} />;
     }
   };
 
+  console.log(TAG, '渲染, 当前页面:', screen, '连接状态:', state.connectedHost ? '已连接' : '未连接');
+
   return (
+    <ErrorBoundary>
     <SafeAreaView style={styles.container}>
       {/* SessionListScreen 始终挂载，切换时只是隐藏 */}
       <View style={{ flex: 1, display: isSessionVisible ? 'flex' : 'none' }}>
@@ -120,7 +123,7 @@ export default function App() {
           host={state.connectedHost || undefined}
           token={state.token}
           onSelect={handleSelectSession}
-          onBack={() => setScreen('home')}
+          onBack={() => handleScreenChange('home')}
           visible={screen === 'sessions'}
         />
       </View>
@@ -132,8 +135,8 @@ export default function App() {
             sessionId={state.currentSessionId || 'unknown'}
             host={state.connectedHost || undefined}
             token={state.token}
-            onBack={() => setScreen('sessions')}
-            onSend={(msg) => console.log('Send:', msg)}
+            onBack={() => handleScreenChange('sessions')}
+            onSend={(msg) => console.log(TAG, '发送消息:', msg.slice(0, 50))}
           />
         </View>
       )}
@@ -141,6 +144,7 @@ export default function App() {
       {/* 其他页面 */}
       {screen !== 'sessions' && screen !== 'chat' && renderScreen()}
     </SafeAreaView>
+    </ErrorBoundary>
   );
 }
 

@@ -9,15 +9,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { useConnectionStore } from '../store/connectionStore';
+import { ApiService } from '../services/ApiService';
 import { getConnectionHistory, saveConnectionHistory, ConnectionHistoryItem } from '../utils/connectionStorage';
 
 interface ConnectionScreenProps {
-  onConnected?: (host: string) => void;
+  onConnected?: (host: string, token?: string) => void;
   onBack?: () => void;
-  onScan?: () => void;
 }
 
-export function ConnectionScreen({ onConnected, onBack, onScan }: ConnectionScreenProps) {
+const TAG = '[ConnectionScreen]';
+
+export function ConnectionScreen({ onConnected, onBack }: ConnectionScreenProps) {
   const [host, setHost] = useState('');
   const [port, setPort] = useState('32107');
   const [pairCode, setPairCode] = useState('');
@@ -25,44 +28,30 @@ export function ConnectionScreen({ onConnected, onBack, onScan }: ConnectionScre
   const [error, setError] = useState('');
   const [history, setHistory] = useState<ConnectionHistoryItem[]>([]);
 
-  // 加载连接历史
+  const { connect, disconnect } = useConnectionStore();
+
   useEffect(() => {
+    console.log(TAG, '屏幕已挂载');
     getConnectionHistory().then(setHistory);
+    return () => console.log(TAG, '屏幕将卸载');
   }, []);
 
   const doConnect = async (fullHost: string, code: string) => {
+    console.log(TAG, 'doConnect:', fullHost);
     setStatus('connecting');
     setError('');
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      try {
-        const response = await fetch(`http://${fullHost}/health/live`, {
-          method: 'GET',
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          setStatus('connected');
-          await saveConnectionHistory(fullHost, code);
-          // 刷新历史列表
-          const updated = await getConnectionHistory();
-          setHistory(updated);
-          onConnected?.(fullHost);
-        } else {
-          throw new Error('连接失败');
-        }
-      } catch (fetchErr: any) {
-        clearTimeout(timeoutId);
-        if (fetchErr.name === 'AbortError') {
-          throw new Error('连接超时');
-        }
-        throw fetchErr;
-      }
+      const [h, p] = fullHost.split(':');
+      await connect(h, parseInt(p) || 32107, code);
+      setStatus('connected');
+      await saveConnectionHistory(fullHost, code);
+      setHistory(await getConnectionHistory());
+      const token = useConnectionStore.getState().token;
+      console.log(TAG, '连接成功, token:', token ? `${token.slice(0, 4)}...` : null);
+      onConnected?.(fullHost, token || undefined);
     } catch (err: any) {
+      console.error(TAG, '连接失败:', err?.message || err);
       setStatus('error');
       setError(err.message || '连接失败');
     }

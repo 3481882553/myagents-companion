@@ -8,14 +8,32 @@
  * - 小助理入口（预留）
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { useConnectionStore } from '../store/connectionStore';
+
+const TAG = '[HomeScreen]';
 
 interface HomeScreenProps {
   onNavigate: (screen: string) => void;
 }
 
 export function HomeScreen({ onNavigate }: HomeScreenProps) {
+  const { status, host } = useConnectionStore();
+  const isConnected = status === 'connected';
+
+  useEffect(() => {
+    console.log(TAG, '屏幕已挂载, 连接状态:', status);
+    return () => console.log(TAG, '屏幕将卸载');
+  }, []);
+
+  const handleNavigate = (screen: string) => {
+    console.log(TAG, '导航到:', screen);
+    onNavigate(screen);
+  };
+
+  console.log(TAG, '渲染, 状态:', status);
+
   return (
     <ScrollView style={styles.container}>
       {/* 标题 */}
@@ -25,12 +43,12 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       {/* 连接状态卡片 */}
       <View style={styles.statusCard}>
         <View style={styles.statusRow}>
-          <View style={[styles.statusDot, { backgroundColor: '#dc2626' }]} />
-          <Text style={styles.statusText}>未连接</Text>
+          <View style={[styles.statusDot, { backgroundColor: isConnected ? '#22c55e' : '#dc2626' }]} />
+          <Text style={styles.statusText}>{isConnected ? `已连接 ${host}` : '未连接'}</Text>
         </View>
         <TouchableOpacity
           style={styles.connectBtn}
-          onPress={() => onNavigate('connection')}
+          onPress={() => handleNavigate('connection')}
         >
           <Text style={styles.connectBtnText}>连接桌面端</Text>
         </TouchableOpacity>
@@ -41,14 +59,14 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       <View style={styles.quickActions}>
         <TouchableOpacity
           style={styles.quickAction}
-          onPress={() => onNavigate('connection')}
+          onPress={() => handleNavigate('connection')}
         >
           <Text style={styles.quickActionIcon}>🔗</Text>
           <Text style={styles.quickActionText}>扫码连接</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.quickAction}
-          onPress={() => onNavigate('sessions')}
+          onPress={() => handleNavigate('sessions')}
         >
           <Text style={styles.quickActionIcon}>💬</Text>
           <Text style={styles.quickActionText}>会话列表</Text>

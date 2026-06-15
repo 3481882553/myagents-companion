@@ -6,19 +6,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { useConnectionStore } from '../store/connectionStore';
+import { useSessionStore } from '../store/sessionStore';
+import { ApiService } from '../services/ApiService';
 
-interface Session {
-  id: string;
-  title: string;
-  lastMessageAt: number;
-  messageCount?: number;
-}
+const TAG = '[SessionListScreen]';
 
 interface SessionListScreenProps {
   host?: string;
   token?: string | null;
   onSelect?: (sessionId: string) => void;
   onBack?: () => void;
+  visible?: boolean;
 }
 
 function formatTime(timestamp: number): string {
@@ -32,37 +31,34 @@ function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString('zh-CN');
 }
 
-export function SessionListScreen({ host, token, onSelect, onBack }: SessionListScreenProps) {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+export function SessionListScreen({ host, token, onSelect, onBack, visible }: SessionListScreenProps) {
+  const { host: storeHost, token: storeToken } = useConnectionStore();
+  const { sessions, setSessions, loading, setLoading, error, setError } = useSessionStore();
+  const effectiveHost = host || storeHost;
+  const effectiveToken = token || storeToken;
 
   useEffect(() => {
+    console.log(TAG, '屏幕已挂载, host:', effectiveHost || '(未设置)');
     loadSessions();
-  }, [host]);
+    return () => console.log(TAG, '屏幕将卸载');
+  }, [effectiveHost]);
 
   const loadSessions = async () => {
-    if (!host) {
-      // PoC 阶段返回模拟数据
-      setSessions([
-        { id: 'ses_001', title: '代码审查助手', lastMessageAt: Date.now() - 300000, messageCount: 42 },
-        { id: 'ses_002', title: '文档生成器', lastMessageAt: Date.now() - 3600000, messageCount: 18 },
-        { id: 'ses_003', title: '调试助手', lastMessageAt: Date.now() - 86400000, messageCount: 156 },
-        { id: 'ses_004', title: '小助理', lastMessageAt: Date.now() - 60000, messageCount: 8 },
-      ]);
+    if (!effectiveHost) {
+      console.log(TAG, '无 host, 跳过加载');
+      setSessions([]);
       setLoading(false);
       return;
     }
 
+    console.log(TAG, '开始加载会话...');
     try {
-      const response = await fetch(`http://${host}/api/session/list`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      const data = await response.json();
-      // 按最后消息时间倒序排列（最新的在上面）
-      const sorted = (data.sessions || []).sort((a: Session, b: Session) => b.lastMessageAt - a.lastMessageAt);
-      setSessions(sorted);
+      const api = new ApiService({ host: effectiveHost, port: 32107, token: effectiveToken || '' });
+      const sessionList = await api.getSessions();
+      console.log(TAG, '加载成功:', sessionList.length, '个会话');
+      setSessions(sessionList);
     } catch (err: any) {
+      console.error(TAG, '加载失败:', err?.message || err);
       setError(err.message || '加载失败');
     } finally {
       setLoading(false);
@@ -98,7 +94,10 @@ export function SessionListScreen({ host, token, onSelect, onBack }: SessionList
             <TouchableOpacity
               key={session.id}
               style={styles.sessionCard}
-              onPress={() => onSelect?.(session.id)}
+              onPress={() => {
+                console.log(TAG, '选中会话:', session.id, session.title);
+                onSelect?.(session.id);
+              }}
             >
               <Text style={styles.sessionTitle} numberOfLines={1}>{session.title}</Text>
               <Text style={styles.sessionTime}>{formatTime(session.lastMessageAt)}</Text>

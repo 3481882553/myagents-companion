@@ -32,6 +32,8 @@ const QUICK_ACTIONS = [
   { id: 'help', label: '❓ 使用帮助', prompt: '介绍一下你能做什么，怎么使用' },
 ];
 
+const TAG = '[HelperScreen]';
+
 export function HelperScreen({ host, token, onBack }: HelperScreenProps) {
   const [messages, setMessages] = useState<HelperMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -39,6 +41,10 @@ export function HelperScreen({ host, token, onBack }: HelperScreenProps) {
   const scrollViewRef = useRef<any>(null);
 
   // 初始欢迎消息
+  useEffect(() => {
+    console.log(TAG, '屏幕已挂载, host:', host || '(未设置)');
+    return () => console.log(TAG, '屏幕将卸载');
+  }, []);
   useEffect(() => {
     if (messages.length === 0) {
       setMessages([{
@@ -53,6 +59,8 @@ export function HelperScreen({ host, token, onBack }: HelperScreenProps) {
   const handleSend = async (text?: string) => {
     const msg = text || inputText.trim();
     if (!msg || loading) return;
+
+    console.log(TAG, 'handleSend:', { msgLen: msg.length, host: !!host });
 
     // 添加用户消息
     const userMsg: HelperMessage = {

@@ -112,6 +112,8 @@ interface ChatScreenProps {
   onBack?: () => void;
 }
 
+const TAG = '[ChatScreen]';
+
 export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBack }: ChatScreenProps) {
   const [inputText, setInputText] = useState('');
   const [displayMessages, setDisplayMessages] = useState<Message[]>(messages);
@@ -119,6 +121,16 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
   const scrollViewRef = useRef<any>(null);
   const hasScrolledToBottom = useRef(false);
   const messageCountRef = useRef(0);
+
+  const { host: storeHost, token: storeToken } = useConnectionStore();
+  const { loadMessagesFromApi, sendMessage, loadMessages } = useMessageStore();
+  const effectiveHost = host || storeHost;
+  const effectiveToken = token || storeToken;
+
+  useEffect(() => {
+    console.log(TAG, '屏幕已挂载, sessionId:', sessionId, 'host:', effectiveHost || '(未设置)');
+    return () => console.log(TAG, '屏幕将卸载, sessionId:', sessionId);
+  }, [sessionId]);
 
   // 过滤掉工具调用消息（content 为空或 system 消息）
   const filteredMessages = useMemo(() => {
@@ -132,26 +144,16 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
 
   // 加载消息
   useEffect(() => {
-    if (!host) {
+    if (!effectiveHost) {
       setDisplayMessages(messages);
       setLoading(false);
       return;
     }
 
-    const loadMessages = async () => {
+    const loadMsgs = async () => {
       try {
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-        const res = await fetch(`http://${host}/api/session/messages?sessionId=${sessionId}`, { headers, signal: controller.signal });
-        clearTimeout(timeoutId);
-        const data = await res.json();
-        if (data.messages && data.messages.length > 0) {
-          // 只显示最近 50 条消息，避免大数据量导致卡顿
-          const recent = data.messages.slice(-50);
-          setDisplayMessages(recent);
-        }
+        const msgs = await loadMessagesFromApi(sessionId, effectiveHost, effectiveToken || '');
+        setDisplayMessages(msgs);
       } catch {
         // 静默失败
       } finally {
@@ -159,13 +161,15 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
       }
     };
 
-    loadMessages();
-  }, [sessionId, host, token, messages]);
+    loadMsgs();
+  }, [sessionId, effectiveHost, effectiveToken]);
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
 
     const text = inputText.trim();
+    console.log(TAG, 'handleSend:', { sessionId, textLen: text.length });
+
     const userMessage: Message = {
       id: `user_${Date.now()}`,
       role: 'user',
@@ -176,40 +180,29 @@ export function ChatScreen({ sessionId, host, token, messages = [], onSend, onBa
     // 立即显示用户消息
     setDisplayMessages(prev => [...prev, userMessage]);
     setInputText('');
+    console.log(TAG, '用户消息已添加到本地:', userMessage.id);
 
-    // 调用 Sidecar 发送 API
-    if (host && token) {
+    // 使用 messageStore 发送消息
+    if (effectiveHost && effectiveToken) {
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-        await fetch(`http://${host}/api/session/send`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ sessionId, message: text }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        // 暂时通过轮询获取最新消息
+        console.log(TAG, '发送到 Sidecar...');
+        await sendMessage(sessionId, text, effectiveHost, effectiveToken);
+        console.log(TAG, '发送成功, 等待回复...');
+        // 轮询获取最新消息
         setTimeout(async () => {
           try {
-            const headers: Record<string, string> = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-            const ctrl = new AbortController();
-            const tid = setTimeout(() => ctrl.abort(), 10000);
-            const res = await fetch(`http://${host}/api/session/messages?sessionId=${sessionId}`, { headers, signal: ctrl.signal });
-            clearTimeout(tid);
-            const data = await res.json();
-            if (data.messages && data.messages.length > 0) {
-              setDisplayMessages(data.messages);
-            }
-          } catch {}
-        }, 3000); // 3秒后轮询一次
-      } catch {
-        // 发送失败时保留用户消息
+            const msgs = await loadMessagesFromApi(sessionId, effectiveHost, effectiveToken);
+            console.log(TAG, '轮询获取到', msgs.length, '条消息');
+            setDisplayMessages(msgs);
+          } catch (err: any) {
+            console.error(TAG, '轮询失败:', err?.message);
+          }
+        }, 3000);
+      } catch (err: any) {
+        console.error(TAG, '发送失败:', err?.message);
       }
+    } else {
+      console.warn(TAG, '未连接, 消息仅保存在本地');
     }
 
     // 调用外部回调（如果有）
