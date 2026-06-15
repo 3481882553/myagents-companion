@@ -14,7 +14,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
-    }
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./poc/app/node_modules/@types"
+    ]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "poc"]

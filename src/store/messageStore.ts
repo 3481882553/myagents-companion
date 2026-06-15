@@ -1,97 +1,91 @@
 /**
- * messageStore — 消息状态管理
- *
- * 职责：管理流式消息拼接、历史消息加载
+ * messageStore v2 — Zustand 状态管理
+ * v0.2 架构升级 — 消息状态
  */
 
 import { create } from 'zustand';
-
-export interface Message {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  toolCalls?: any[];
-  createdAt: number;
-}
+import type { Message } from '../types/message';
 
 interface MessageState {
   messages: Record<string, Message[]>;
   streaming: Record<string, string>;
+  loading: boolean;
 }
 
 interface MessageActions {
+  loadMessages: (sessionId: string, messages: Message[]) => void;
+  appendMessage: (sessionId: string, message: Message) => void;
   startStreaming: (messageId: string) => void;
   appendChunk: (messageId: string, text: string) => void;
   completeStreaming: (messageId: string, sessionId: string) => void;
-  loadMessages: (sessionId: string, messages: Message[]) => void;
+  clearMessages: (sessionId: string) => void;
+  setLoading: (loading: boolean) => void;
 }
 
-type MessageStore = MessageState & MessageActions;
-
-const initialState: MessageState = {
-  messages: {},
-  streaming: {},
-};
+export type MessageStore = MessageState & MessageActions;
 
 export function createMessageStore() {
   return create<MessageStore>((set, get) => ({
-    ...initialState,
+    messages: {},
+    streaming: {},
+    loading: false,
 
-    startStreaming: (messageId) => {
-      set({
-        streaming: {
-          ...get().streaming,
-          [messageId]: '',
-        },
-      });
-    },
+    loadMessages: (sessionId, messages) => set((state) => ({
+      messages: { ...state.messages, [sessionId]: messages },
+    })),
 
-    appendChunk: (messageId, text) => {
-      const streaming = get().streaming;
-      const current = streaming[messageId] || '';
-      set({
-        streaming: {
-          ...streaming,
-          [messageId]: current + text,
-        },
-      });
-    },
+    appendMessage: (sessionId, message) => set((state) => ({
+      messages: {
+        ...state.messages,
+        [sessionId]: [...(state.messages[sessionId] || []), message],
+      },
+    })),
+
+    startStreaming: (messageId) => set((state) => ({
+      streaming: { ...state.streaming, [messageId]: '' },
+    })),
+
+    appendChunk: (messageId, text) => set((state) => ({
+      streaming: {
+        ...state.streaming,
+        [messageId]: (state.streaming[messageId] || '') + text,
+      },
+    })),
 
     completeStreaming: (messageId, sessionId) => {
-      const streaming = get().streaming;
-      const content = streaming[messageId] || '';
+      const state = get();
+      const content = state.streaming[messageId] || '';
 
       // 从 streaming 中移除
-      const newStreaming = { ...streaming };
+      const newStreaming = { ...state.streaming };
       delete newStreaming[messageId];
 
-      // 添加到 messages
-      const currentMessages = get().messages;
-      const sessionMessages = currentMessages[sessionId] || [];
+      // 创建新消息
       const newMessage: Message = {
         id: messageId,
+        sessionId,
         role: 'assistant',
         content,
         createdAt: Date.now(),
+        status: 'sent',
       };
 
+      // 添加到 messages
       set({
         streaming: newStreaming,
         messages: {
-          ...currentMessages,
-          [sessionId]: [...sessionMessages, newMessage],
+          ...state.messages,
+          [sessionId]: [...(state.messages[sessionId] || []), newMessage],
         },
       });
     },
 
-    loadMessages: (sessionId, messages) => {
-      const currentMessages = get().messages;
-      set({
-        messages: {
-          ...currentMessages,
-          [sessionId]: messages,
-        },
-      });
-    },
+    clearMessages: (sessionId) => set((state) => {
+      const newMessages = { ...state.messages };
+      delete newMessages[sessionId];
+      return { messages: newMessages };
+    }),
+
+    setLoading: (loading) => set({ loading }),
   }));
 }

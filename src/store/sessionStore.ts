@@ -1,56 +1,59 @@
 /**
- * sessionStore — 会话状态管理
- *
- * 职责：管理会话列表、当前会话、会话消息
+ * sessionStore v2 — Zustand 状态管理
+ * v0.2 架构升级 — 全局状态
  */
 
 import { create } from 'zustand';
-
-export interface Session {
-  id: string;
-  title: string;
-  lastMessageAt: number;
-  messageCount?: number;
-  internal?: boolean;
-}
+import type { Session } from '../types/session';
 
 interface SessionState {
   sessions: Session[];
-  currentSession: string | null;
-  messages: Record<string, any[]>;
+  currentSessionId: string | null;
+  loading: boolean;
+  error: string | null;
 }
 
 interface SessionActions {
   loadSessions: (sessions: Session[]) => void;
   selectSession: (sessionId: string) => void;
-  appendMessage: (sessionId: string, message: any) => void;
+  appendMessage: (sessionId: string) => void;
+  updateSession: (sessionId: string, updates: Partial<Session>) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+  clearError: () => void;
 }
 
-type SessionStore = SessionState & SessionActions;
-
-const initialState: SessionState = {
-  sessions: [],
-  currentSession: null,
-  messages: {},
-};
+export type SessionStore = SessionState & SessionActions;
 
 export function createSessionStore() {
-  return create<SessionStore>((set, get) => ({
-    ...initialState,
+  return create<SessionStore>((set) => ({
+    sessions: [],
+    currentSessionId: null,
+    loading: false,
+    error: null,
 
-    loadSessions: (sessions) => set({ sessions }),
+    loadSessions: (sessions) => set({ sessions, loading: false, error: null }),
 
-    selectSession: (sessionId) => set({ currentSession: sessionId }),
+    selectSession: (sessionId) => set({ currentSessionId: sessionId }),
 
-    appendMessage: (sessionId, message) => {
-      const messages = get().messages;
-      const sessionMessages = messages[sessionId] || [];
-      set({
-        messages: {
-          ...messages,
-          [sessionId]: [...sessionMessages, message],
-        },
-      });
-    },
+    appendMessage: (sessionId) => set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === sessionId
+          ? { ...s, messageCount: s.messageCount + 1, lastMessageAt: Date.now() }
+          : s
+      ),
+    })),
+
+    updateSession: (sessionId, updates) => set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === sessionId ? { ...s, ...updates } : s
+      ),
+    })),
+
+    setLoading: (loading) => set({ loading }),
+
+    setError: (error) => set({ error, loading: false }),
+
+    clearError: () => set({ error: null }),
   }));
 }

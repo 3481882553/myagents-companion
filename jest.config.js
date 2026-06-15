@@ -41,5 +41,6 @@ module.exports = {
     '^react-native-keychain$': '<rootDir>/src/__tests__/mocks/react-native-keychain.js',
     '^react-native-sse$': '<rootDir>/src/__tests__/mocks/react-native-sse.js',
     '^@react-native-clipboard/clipboard$': '<rootDir>/src/__tests__/mocks/clipboard.js',
+    '^@react-native-async-storage/async-storage$': '<rootDir>/src/__tests__/mocks/async-storage.js',
   },
 };
