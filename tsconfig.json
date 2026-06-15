@@ -10,16 +10,17 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
     "types": ["jest", "node"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["poc/app/src/*"]
     },
     "typeRoots": [
       "./node_modules/@types",
       "./poc/app/node_modules/@types"
     ]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "poc"]
+  "include": ["poc/app/src/**/*"],
+  "exclude": ["node_modules", "poc/app/node_modules"]
 }
