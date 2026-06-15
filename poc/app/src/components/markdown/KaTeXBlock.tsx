@@ -15,8 +15,9 @@ interface KaTeXBlockProps {
   onReady?: (height: number) => void;
 }
 
-// PoC 阶段用 CDN，正式版改为 asset://
-const KATEX_CDN = 'https://cdn.jsdelivr.net/npm/katex@0.16.11';
+// 本地 asset 加载（断网可用）
+const KATEX_JS = 'file:///android_asset/webview/katex.min.js';
+const KATEX_CSS = 'file:///android_asset/webview/katex.min.css';
 
 export function KaTeXBlock({ formula, displayMode = true, onReady }: KaTeXBlockProps) {
   const [height, setHeight] = useState(50);
@@ -27,8 +28,8 @@ export function KaTeXBlock({ formula, displayMode = true, onReady }: KaTeXBlockP
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <link rel="stylesheet" href="${KATEX_CDN}/dist/katex.min.css">
-  <script src="${KATEX_CDN}/dist/katex.min.js"></script>
+  <link rel="stylesheet" href="${KATEX_CSS}">
+  <script src="${KATEX_JS}"></script>
   <style>
     body { margin: 0; padding: 8px; overflow: hidden; background: transparent; }
     .katex { font-size: ${displayMode ? '1.1em' : '1em'}; }

@@ -1,10 +1,11 @@
 /**
- * MarkdownRenderer — 简化版 Markdown 渲染（PoC）
- * 支持：标题、列表、引用、粗体、斜体、行内代码、代码块
+ * MarkdownRenderer — 基于 react-native-markdown-display 的 GFM 渲染
+ * 支持：标题、列表、引用、粗体、斜体、行内代码、代码块、表格、任务列表
  */
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet, useColorScheme } from 'react-native';
+import Markdown from 'react-native-markdown-display';
 import { lightTokens, darkTokens } from '../../theme/tokens';
 
 interface MarkdownRendererProps {
@@ -12,148 +13,116 @@ interface MarkdownRendererProps {
   theme?: 'light' | 'dark';
 }
 
-function renderInline(text: string): React.ReactNode[] {
-  const parts: React.ReactNode[] = [];
-  // 简单处理：粗体、斜体、行内代码
-  const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)/g;
-  let lastIndex = 0;
-  let match;
-  let key = 0;
+export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
+  const systemTheme = useColorScheme();
+  const activeTheme = theme || (systemTheme === 'dark' ? 'dark' : 'light');
+  const tokens = activeTheme === 'dark' ? darkTokens : lightTokens;
+  const isDark = activeTheme === 'dark';
 
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(<Text key={key++}>{text.slice(lastIndex, match.index)}</Text>);
-    }
-    if (match[2]) {
-      parts.push(<Text key={key++} style={{ fontWeight: '700' }}>{match[2]}</Text>);
-    } else if (match[4]) {
-      parts.push(<Text key={key++} style={{ fontStyle: 'italic' }}>{match[4]}</Text>);
-    } else if (match[6]) {
-      parts.push(<Text key={key++} style={{ fontFamily: 'monospace', backgroundColor: 'rgba(28,22,18,0.06)', fontSize: 13, borderRadius: 3, paddingHorizontal: 4 }}>{match[6]}</Text>);
-    }
-    lastIndex = match.index + match[0].length;
-  }
-  if (lastIndex < text.length) {
-    parts.push(<Text key={key++}>{text.slice(lastIndex)}</Text>);
-  }
-  return parts.length > 0 ? parts : [<Text key={0}>{text}</Text>];
-}
-
-export function MarkdownRenderer({ content, theme = 'light' }: MarkdownRendererProps) {
-  const tokens = theme === 'dark' ? darkTokens : lightTokens;
   if (!content) return null;
 
-  const lines = content.split('\n');
-  const elements: React.ReactNode[] = [];
-  let inCodeBlock = false;
-  let codeLines: string[] = [];
-  let key = 0;
-
-  for (const line of lines) {
-    // 代码块
-    if (line.startsWith('```')) {
-      if (inCodeBlock) {
-        elements.push(
-          <View key={key++} style={styles.codeBlock}>
-            <Text style={styles.codeText} selectable>{codeLines.join('\n')}</Text>
-          </View>
-        );
-        codeLines = [];
-        inCodeBlock = false;
-      } else {
-        inCodeBlock = true;
-      }
-      continue;
-    }
-    if (inCodeBlock) {
-      codeLines.push(line);
-      continue;
-    }
-
-    // 空行
-    if (line.trim() === '') {
-      elements.push(<View key={key++} style={{ height: 8 }} />);
-      continue;
-    }
-
-    // 标题
-    if (line.startsWith('### ')) {
-      elements.push(<Text key={key++} style={[styles.h3, { color: tokens.ink }]}>{line.slice(4)}</Text>);
-      continue;
-    }
-    if (line.startsWith('## ')) {
-      elements.push(<Text key={key++} style={[styles.h2, { color: tokens.ink }]}>{line.slice(3)}</Text>);
-      continue;
-    }
-    if (line.startsWith('# ')) {
-      elements.push(<Text key={key++} style={[styles.h1, { color: tokens.ink }]}>{line.slice(2)}</Text>);
-      continue;
-    }
-
-    // 列表
-    if (line.startsWith('- ') || line.startsWith('* ')) {
-      elements.push(
-        <Text key={key++} style={[styles.listItem, { color: tokens.ink }]}>
-          {renderInline('• ' + line.slice(2))}
-        </Text>
-      );
-      continue;
-    }
-
-    // 有序列表
-    const orderedMatch = line.match(/^(\d+)\.\s(.+)/);
-    if (orderedMatch) {
-      elements.push(
-        <Text key={key++} style={[styles.listItem, { color: tokens.ink }]}>
-          {renderInline(`${orderedMatch[1]}. ${orderedMatch[2]}`)}
-        </Text>
-      );
-      continue;
-    }
-
-    // 引用
-    if (line.startsWith('> ')) {
-      elements.push(
-        <View key={key++} style={[styles.quote, { borderLeftColor: tokens.accentWarm }]}>
-          <Text style={[styles.quoteText, { color: tokens.inkMuted }]}>{renderInline(line.slice(2))}</Text>
-        </View>
-      );
-      continue;
-    }
-
-    // 分割线
-    if (line.match(/^[-*_]{3,}$/)) {
-      elements.push(<View key={key++} style={styles.hr} />);
-      continue;
-    }
-
-    // 表格行（简化：跳过分隔行）
-    if (line.startsWith('|') && line.match(/^\|[\s-|]+\|$/)) continue;
-
-    // 普通段落
-    elements.push(
-      <Text key={key++} style={[styles.paragraph, { color: tokens.ink }]}>
-        {renderInline(line)}
-      </Text>
-    );
-  }
-
-  return <View style={styles.container}>{elements}</View>;
+  return (
+    <Markdown
+      style={{
+        body: { color: tokens.ink, fontSize: 15, lineHeight: 22 },
+        heading1: {
+          fontSize: 24,
+          fontWeight: '700',
+          color: tokens.ink,
+          marginBottom: 8,
+          marginTop: 16,
+        },
+        heading2: {
+          fontSize: 20,
+          fontWeight: '600',
+          color: tokens.ink,
+          marginBottom: 6,
+          marginTop: 12,
+        },
+        heading3: {
+          fontSize: 17,
+          fontWeight: '600',
+          color: tokens.ink,
+          marginBottom: 4,
+          marginTop: 8,
+        },
+        heading4: { fontSize: 16, fontWeight: '600', color: tokens.ink },
+        heading5: { fontSize: 15, fontWeight: '600', color: tokens.ink },
+        heading6: { fontSize: 14, fontWeight: '600', color: tokens.inkMuted },
+        paragraph: { marginBottom: 4, marginTop: 0 },
+        list_item: { marginBottom: 2 },
+        bullet_list: { marginBottom: 4 },
+        ordered_list: { marginBottom: 4 },
+        blockquote: {
+          borderLeftWidth: 3,
+          borderLeftColor: tokens.accentWarm,
+          paddingLeft: 12,
+          marginVertical: 4,
+          backgroundColor: 'transparent',
+        },
+        code_inline: {
+          backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+          color: tokens.ink,
+          fontFamily: 'monospace',
+          fontSize: 13,
+          paddingHorizontal: 4,
+          borderRadius: 3,
+        },
+        code_block: {
+          backgroundColor: isDark ? '#1e1e1e' : '#f4f4f4',
+          color: tokens.ink,
+          fontFamily: 'monospace',
+          fontSize: 13,
+          padding: 12,
+          borderRadius: 8,
+          marginVertical: 8,
+        },
+        fence: {
+          backgroundColor: isDark ? '#1e1e1e' : '#f4f4f4',
+          color: tokens.ink,
+          fontFamily: 'monospace',
+          fontSize: 13,
+          padding: 12,
+          borderRadius: 8,
+          marginVertical: 8,
+        },
+        table: {
+          borderWidth: 1,
+          borderColor: 'rgba(28,22,18,0.12)',
+          borderRadius: 4,
+          marginVertical: 8,
+        },
+        thead: {
+          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+        },
+        th: {
+          padding: 8,
+          fontWeight: '600',
+          color: tokens.ink,
+          borderWidth: 1,
+          borderColor: 'rgba(28,22,18,0.08)',
+        },
+        td: {
+          padding: 8,
+          color: tokens.ink,
+          borderWidth: 1,
+          borderColor: 'rgba(28,22,18,0.08)',
+        },
+        tr: {
+          borderColor: 'rgba(28,22,18,0.08)',
+        },
+        hr: {
+          backgroundColor: 'rgba(28,22,18,0.12)',
+          height: 1,
+          marginVertical: 16,
+        },
+        link: { color: '#3b82f6', textDecorationLine: 'underline' },
+        s: { color: tokens.inkMuted, textDecorationLine: 'line-through' },
+        em: { fontStyle: 'italic' },
+        strong: { fontWeight: '700' },
+      }}
+    >
+      {content}
+    </Markdown>
+  );
 }
-
-const styles = StyleSheet.create({
-  container: { paddingVertical: 4 },
-  h1: { fontSize: 22, fontWeight: '700', marginTop: 12, marginBottom: 8 },
-  h2: { fontSize: 19, fontWeight: '600', marginTop: 10, marginBottom: 6 },
-  h3: { fontSize: 17, fontWeight: '600', marginTop: 8, marginBottom: 4 },
-  paragraph: { fontSize: 15, lineHeight: 22, marginBottom: 4 },
-  listItem: { fontSize: 15, lineHeight: 22, marginBottom: 2, paddingLeft: 16 },
-  quote: { borderLeftWidth: 3, paddingLeft: 12, marginVertical: 4 },
-  quoteText: { fontSize: 15, lineHeight: 22, fontStyle: 'italic' },
-  codeBlock: {
-    backgroundColor: 'rgba(28,22,18,0.06)', fontFamily: 'monospace', fontSize: 13,
-    lineHeight: 18, padding: 12, borderRadius: 6, marginVertical: 8, overflow: 'scroll',
-  },
-  codeText: { fontFamily: 'monospace', fontSize: 13, lineHeight: 18 },
-  hr: { height: 1, backgroundColor: 'rgba(28,22,18,0.10)', marginVertical: 12 },
-});

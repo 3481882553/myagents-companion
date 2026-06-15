@@ -14,8 +14,8 @@ interface MermaidDiagramProps {
   theme?: 'light' | 'dark';
 }
 
-// PoC 阶段用 CDN，正式版改为 asset://
-const MERMAID_CDN = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1';
+// 本地 asset 加载（断网可用）
+const MERMAID_JS = 'file:///android_asset/webview/mermaid.min.js';
 
 export function MermaidDiagram({ code, theme = 'light' }: MermaidDiagramProps) {
   const [height, setHeight] = useState(200);
@@ -27,7 +27,7 @@ export function MermaidDiagram({ code, theme = 'light' }: MermaidDiagramProps) {
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <script src="${MERMAID_CDN}/dist/mermaid.min.js"></script>
+  <script src="${MERMAID_JS}"></script>
   <style>
     body { margin: 0; padding: 8px; background: transparent; }
     #mermaid-container { display: inline-block; min-width: 100%; }
