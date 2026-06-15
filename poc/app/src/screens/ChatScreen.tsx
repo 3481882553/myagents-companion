@@ -201,13 +201,7 @@ export function ChatScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* 标题栏 */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtn}>← 返回</Text>
-        </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>会话 {sessionId.slice(0, 8)}</Text>
-      </View>
+      {/* 标题栏由 React Navigation 提供 */}
 
       {/* 消息列表 */}
       <ScrollView

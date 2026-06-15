@@ -28,7 +28,7 @@ export function HomeScreen({ navigation }: Props) {
 
   const handleNavigate = (screen: string) => {
     console.log(TAG, '导航到:', screen);
-    onNavigate(screen);
+    navigation.navigate(screen as any);
   };
 
   console.log(TAG, '渲染, 状态:', status);
@@ -47,7 +47,7 @@ export function HomeScreen({ navigation }: Props) {
         </View>
         <TouchableOpacity
           style={styles.connectBtn}
-          onPress={() => handleNavigate('connection')}
+          onPress={() => handleNavigate('Connection')}
         >
           <Text style={styles.connectBtnText}>连接桌面端</Text>
         </TouchableOpacity>
@@ -58,21 +58,21 @@ export function HomeScreen({ navigation }: Props) {
       <View style={styles.quickActions}>
         <TouchableOpacity
           style={styles.quickAction}
-          onPress={() => handleNavigate('connection')}
+          onPress={() => handleNavigate('Connection')}
         >
           <Text style={styles.quickActionIcon}>🔗</Text>
           <Text style={styles.quickActionText}>扫码连接</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.quickAction}
-          onPress={() => handleNavigate('sessions')}
+          onPress={() => handleNavigate('SessionList')}
         >
           <Text style={styles.quickActionIcon}>💬</Text>
           <Text style={styles.quickActionText}>会话列表</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.quickAction}
-          onPress={() => onNavigate('helper')}
+          onPress={() => handleNavigate('Helper')}
         >
           <Text style={styles.quickActionIcon}>🤖</Text>
           <Text style={styles.quickActionText}>小助理</Text>
@@ -84,19 +84,19 @@ export function HomeScreen({ navigation }: Props) {
       <View style={styles.pocSection}>
         <TouchableOpacity
           style={styles.pocBtn}
-          onPress={() => onNavigate('katex')}
+          onPress={() => handleNavigate('KaTeX')}
         >
           <Text style={styles.pocBtnText}>KaTeX 公式渲染</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.pocBtn}
-          onPress={() => onNavigate('mermaid')}
+          onPress={() => handleNavigate('Mermaid')}
         >
           <Text style={styles.pocBtnText}>Mermaid 图表渲染</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.pocBtn}
-          onPress={() => onNavigate('bash')}
+          onPress={() => handleNavigate('Bash')}
         >
           <Text style={styles.pocBtnText}>BashTool 终端输出</Text>
         </TouchableOpacity>

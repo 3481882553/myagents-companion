@@ -78,13 +78,7 @@ export function ConnectionScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* 标题栏 */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtn}>← 返回</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>连接桌面端</Text>
-      </View>
+      {/* 标题栏由 React Navigation 提供 */}
 
       {/* 连接状态 */}
       <View style={styles.statusCard}>

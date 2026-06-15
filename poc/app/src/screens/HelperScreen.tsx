@@ -207,14 +207,12 @@ export function HelperScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* 标题栏 */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtn}>← 返回</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>🤖 小助理</Text>
-        {host && <Text style={styles.connected}>已连接</Text>}
-      </View>
+      {/* 标题栏由 React Navigation 提供 */}
+      {host && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+          <Text style={styles.connected}>已连接 {host}</Text>
+        </View>
+      )}
 
       {/* 消息列表 */}
       <ScrollView
