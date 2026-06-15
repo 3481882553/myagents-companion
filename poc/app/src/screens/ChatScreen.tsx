@@ -123,12 +123,16 @@ export function ChatScreen({ route, navigation }: Props) {
     return () => console.log(TAG, '屏幕将卸载, sessionId:', sessionId);
   }, [sessionId]);
 
-  // 过滤掉工具调用消息（content 为空或 system 消息）
+  // 过滤消息
   const filteredMessages = useMemo(() => {
     return displayMessages.filter(msg => {
-      if (!msg.content || msg.content.trim() === '') return false;
+      // 保留有内容、有工具调用、或有思考过程的消息
+      const hasContent = msg.content && msg.content.trim() !== '';
+      const hasTools = (msg.toolCalls || []).length > 0;
+      const hasThinking = !!msg.thinking;
+      if (!hasContent && !hasTools && !hasThinking) return false;
       // 过滤 system 命令消息
-      if (msg.content.startsWith('<command-name>') || msg.content.startsWith('<local-command-')) return false;
+      if (msg.content?.startsWith('<command-name>') || msg.content?.startsWith('<local-command-')) return false;
       return true;
     });
   }, [displayMessages]);
@@ -259,8 +263,13 @@ export function ChatScreen({ route, navigation }: Props) {
         ) : (
           filteredMessages.map((msg) => {
             try {
-              // 后端已返回结构化数据，直接使用
-              const msgTools = (msg.toolCalls || []) as ToolCallInfo[];
+              // 映射 ToolCall → ToolCallInfo（status→state, output→result）
+              const msgTools: ToolCallInfo[] = (msg.toolCalls || []).map((tc: any) => ({
+                name: tc.name || 'Unknown',
+                input: tc.input || '',
+                state: tc.status || 'completed',
+                result: tc.output,
+              }));
 
               if (msg.role === 'user') {
                 return (
@@ -271,14 +280,21 @@ export function ChatScreen({ route, navigation }: Props) {
               }
 
               // assistant 消息
+              const hasToolsOrThinking = msgTools.length > 0 || msg.thinking;
+
               return (
                 <View key={msg.id} testID="assistant-message" style={styles.assistantBubble}>
                   {msg.content ? <MarkdownRenderer content={msg.content} /> : null}
-                  {msgTools.length > 0 && !msg.content && (
+                  {hasToolsOrThinking && !msg.content && (
                     <Text style={{ fontSize: 13, color: '#968a7e', fontStyle: 'italic' }}>
                       🤔 思考中...
                     </Text>
                   )}
+                  {msg.thinking ? (
+                    <View style={styles.thinkingBlock}>
+                      <Text style={styles.thinkingText} numberOfLines={5}>{msg.thinking}</Text>
+                    </View>
+                  ) : null}
                   {msgTools.map((tool: ToolCallInfo, i: number) => (
                     <ToolCallRow key={`tool-${i}`} tool={tool} />
                   ))}
@@ -383,6 +399,22 @@ const styles = StyleSheet.create({
   },
   assistantBubble: {
     alignSelf: 'flex-start',
+    maxWidth: '100%',
+    paddingRight: 16,
+  },
+  thinkingBlock: {
+    backgroundColor: 'rgba(28, 22, 18, 0.04)',
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 4,
+    borderLeftWidth: 3,
+    borderLeftColor: '#968a7e',
+  },
+  thinkingText: {
+    fontSize: 13,
+    color: '#6f6156',
+    fontStyle: 'italic',
+    lineHeight: 18,
   },
   messageText: {
     fontSize: 15,

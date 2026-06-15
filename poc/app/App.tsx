@@ -3,7 +3,7 @@
  * v0.2 架构升级 — React Navigation + ErrorBoundary + Zustand
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -21,30 +21,32 @@ import { initLogger } from './src/services/MobileLogger';
 import type { RootStackParamList } from './src/navigation/AppNavigator';
 
 const TAG = '[App]';
-
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
+  const [initialRoute, setInitialRoute] = useState<'Home' | 'SessionList' | null>(null);
+
   useEffect(() => {
     console.log(TAG, 'App 已挂载');
 
-    // 启动时恢复持久化连接
     const savedConnection = StorageService.getConnection();
     const savedToken = StorageService.getToken();
     if (savedConnection && savedToken) {
       console.log(TAG, '恢复持久化连接:', savedConnection.host);
-      // 恢复到 Zustand store
       useConnectionStore.getState().restoreConnection(
         savedConnection.host, savedConnection.port, savedToken
       );
-      // 恢复日志
       initLogger(`${savedConnection.host}:${savedConnection.port}`, savedToken);
+      setInitialRoute('SessionList');
     } else {
       console.log(TAG, '无持久化连接');
+      setInitialRoute('Home');
     }
 
     return () => console.log(TAG, 'App 将卸载');
   }, []);
+
+  if (!initialRoute) return null; // 等待检查完毕
 
   return (
     <ErrorBoundary>
@@ -55,53 +57,21 @@ export default function App() {
         }}
       >
         <Stack.Navigator
-          initialRouteName="Home"
+          initialRouteName={initialRoute}
           screenOptions={{
             headerStyle: { backgroundColor: '#faf6ee' },
             headerTintColor: '#1c1612',
             headerTitleStyle: { fontWeight: '600' },
           }}
         >
-          <Stack.Screen
-            name="Home"
-            component={HomeScreen}
-            options={{ title: 'MyAgents Companion' }}
-          />
-          <Stack.Screen
-            name="Connection"
-            component={ConnectionScreen}
-            options={{ title: '连接桌面端' }}
-          />
-          <Stack.Screen
-            name="SessionList"
-            component={SessionListScreen}
-            options={{ title: '会话列表' }}
-          />
-          <Stack.Screen
-            name="Chat"
-            component={ChatScreen}
-            options={{ title: '聊天' }}
-          />
-          <Stack.Screen
-            name="Helper"
-            component={HelperScreen}
-            options={{ title: '小助理' }}
-          />
-          <Stack.Screen
-            name="KaTeX"
-            component={KaTeXDemo}
-            options={{ title: 'KaTeX 公式渲染' }}
-          />
-          <Stack.Screen
-            name="Mermaid"
-            component={MermaidDemo}
-            options={{ title: 'Mermaid 图表' }}
-          />
-          <Stack.Screen
-            name="Bash"
-            component={BashToolDemo}
-            options={{ title: 'BashTool 终端' }}
-          />
+          <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'MyAgents Companion' }} />
+          <Stack.Screen name="Connection" component={ConnectionScreen} options={{ title: '连接桌面端' }} />
+          <Stack.Screen name="SessionList" component={SessionListScreen} options={{ title: '会话列表' }} />
+          <Stack.Screen name="Chat" component={ChatScreen} options={{ title: '聊天' }} />
+          <Stack.Screen name="Helper" component={HelperScreen} options={{ title: '小助理' }} />
+          <Stack.Screen name="KaTeX" component={KaTeXDemo} options={{ title: 'KaTeX 公式渲染' }} />
+          <Stack.Screen name="Mermaid" component={MermaidDemo} options={{ title: 'Mermaid 图表' }} />
+          <Stack.Screen name="Bash" component={BashToolDemo} options={{ title: 'BashTool 终端' }} />
         </Stack.Navigator>
       </NavigationContainer>
     </ErrorBoundary>
