@@ -19,10 +19,11 @@
 ### v0.2 架构升级
 
 - **React Navigation** — 页面栈管理，返回时恢复滚动位置
-- **Zustand** — 全局状态管理，会话/消息状态同步
+- **Zustand** — 全局状态管理，会话/消息/连接状态同步
 - **ApiService** — 统一数据层，前后端格式转换
 - **ErrorBoundary** — 错误边界，防止白屏崩溃
 - **StorageService** — 本地持久化（AsyncStorage + MMKV）
+- **调试日志** — 全链路 console.log，TAG 过滤
 
 ## 快速开始
 
@@ -43,11 +44,36 @@ cd poc/app && npm install
 npx react-native start --port 8081
 
 # 3. 构建并安装 debug APK
-cd android && ./gradlew.bat app:installDebug
+cd android && ./gradlew.bat app:installDebug -PreactNativeDevServerPort=8081
 
-# 4. 设置 ADB 端口转发
+# 4. 设置 ADB 端口转发（USB 连接必须）
 adb reverse tcp:8081 tcp:8081
 adb reverse tcp:32107 tcp:32107
+```
+
+### 连接桌面端
+
+在 App 连接页面输入：
+
+| 字段 | USB 连接 | WiFi 连接 |
+|------|---------|-----------|
+| IP 地址 | `localhost` | 电脑局域网 IP |
+| 端口 | `32107` | `32107` |
+| 配对码 | 桌面端设定的 | 桌面端设定的 |
+
+### 查看调试日志
+
+```bash
+# 实时查看所有 JS 日志
+adb logcat -s ReactNativeJS:V
+
+# 过滤特定模块
+adb logcat -s ReactNativeJS:V | grep "\[ChatScreen\]"
+adb logcat -s ReactNativeJS:V | grep "\[connectionStore\]"
+adb logcat -s ReactNativeJS:V | grep "\[ApiService\]"
+
+# 排除其他 App 干扰
+adb logcat -s ReactNativeJS:V | grep -v "kugou\|qq\.com\|music"
 ```
 
 ### Release 模式
@@ -56,36 +82,32 @@ adb reverse tcp:32107 tcp:32107
 cd poc/app/android && ./gradlew.bat app:installRelease
 ```
 
-## 项目结构
+## 项目结构（v0.2 final）
 
 ```
-myagents-android/
-├── src/                        # v0.2 架构源码
-│   ├── App.tsx                 # 入口（ErrorBoundary + AppNavigator）
-│   ├── navigation/             # React Navigation 配置
-│   │   ├── AppNavigator.tsx    # 主导航器
-│   │   └── LinkingConfig.ts    # 深度链接配置
-│   ├── screens/                # 页面组件（接入 Zustand store）
-│   │   ├── HomeScreen.tsx      # 首页
-│   │   ├── ConnectionScreen.tsx # 连接管理
-│   │   ├── SessionListScreen.tsx # 会话列表
-│   │   ├── ChatScreen.tsx      # 聊天界面
-│   │   └── HelperScreen.tsx    # 小助理
-│   ├── services/               # 服务层
-│   │   ├── ApiService.ts       # 统一 API（格式转换）
-│   │   └── StorageService.ts   # 本地存储
-│   ├── store/                  # Zustand 状态管理
-│   │   ├── sessionStore.ts     # 会话状态
-│   │   └── messageStore.ts     # 消息状态
-│   ├── types/                  # TypeScript 类型定义
-│   │   ├── message.ts
-│   │   ├── session.ts
-│   │   └── connection.ts
-│   └── utils/                  # 工具函数
-│       └── sessionFilter.ts    # 会话过滤
-├── poc/app/                    # React Native 应用（PoC）
-├── v3.0-*.md                   # 设计文档
-└── README.md
+D:\myagents-android\
+├── poc/app/                          ← React Native 项目（唯一代码目录）
+│   ├── index.js                      ← 入口
+│   ├── App.tsx                       ← ErrorBoundary 包裹
+│   ├── metro.config.js               ← Metro 配置（简洁无 watchFolders）
+│   └── src/
+│       ├── components/               ← ErrorBoundary + markdown + tools + PoC 验证
+│       ├── navigation/               ← React Navigation + Linking 配置
+│       ├── screens/                  ← Home / Connection / SessionList / Chat / Helper
+│       ├── services/                 ← ApiService / StorageService / 通信 / 认证 / 日志
+│       ├── store/                    ← Zustand（connectionStore / sessionStore / messageStore）
+│       ├── types/                    ← TypeScript 接口（Message / Session / Connection）
+│       ├── utils/                    ← sessionFilter / connectionStorage
+│       ├── hooks/                    ← useDeepLink 等
+│       ├── db/                       ← SQLite 消息缓存
+│       ├── server/                   ← 服务端中间件（JWT 等）
+│       ├── theme/                    ← 设计 Token + 主题
+│       └── __tests__/                ← mock 文件 + setup
+├── jest.config.js                    ← Jest 配置
+├── tsconfig.json                     ← TypeScript 配置
+├── v3.0-MVP执行计划.md               ← MVP 开发计划
+├── v0.2-架构升级方案.md              ← 架构设计文档
+└── v0.2-问题诊断报告.md              ← 问题诊断与修复记录
 ```
 
 ## 技术栈
@@ -107,18 +129,21 @@ myagents-android/
 | W10 | 消息发送 | ✅ |
 | W6+ | 消息渲染升级 | ✅ |
 | W11 | 小助理 MVP | ✅ |
-| v0.2 | 架构升级 | ✅ |
+| v0.2 | 架构升级 + 代码合并 + 测试修复 | ✅ |
 | W12-13 | 测试 + 修复 | ⏳ |
 
 ## 测试
 
 ```bash
 # 运行所有测试
-npm test
+cd D:/myagents-android
+npx jest --no-coverage
 
-# 运行 v0.2 架构测试
-npx jest src/navigation/__tests__ src/utils/__tests__ src/components/__tests__ src/store/__tests__ src/services/__tests__ --no-coverage
+# 运行核心模块
+npx jest poc/app/src/store poc/app/src/services poc/app/src/utils --no-coverage
 ```
+
+当前测试状态：26 套件通过，208 用例通过。
 
 ## License
 
