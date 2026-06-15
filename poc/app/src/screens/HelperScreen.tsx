@@ -33,7 +33,8 @@ const TAG = '[HelperScreen]';
 type Props = NativeStackScreenProps<RootStackParamList, 'Helper'>;
 
 export function HelperScreen({ navigation }: Props) {
-  const { host, token } = useConnectionStore();
+  const { host, port, token } = useConnectionStore();
+  const baseUrl = host && token ? `http://${host}:${port}` : null;
   const [messages, setMessages] = useState<HelperMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,9 +60,8 @@ export function HelperScreen({ navigation }: Props) {
     const msg = text || inputText.trim();
     if (!msg || loading) return;
 
-    console.log(TAG, 'handleSend:', { msgLen: msg.length, host: !!host });
+    console.log(TAG, 'handleSend:', { msgLen: msg.length, baseUrl: !!baseUrl });
 
-    // 添加用户消息
     const userMsg: HelperMessage = {
       id: `user_${Date.now()}`,
       role: 'user',
@@ -71,134 +71,90 @@ export function HelperScreen({ navigation }: Props) {
     setMessages(prev => [...prev, userMsg]);
     setInputText('');
     setLoading(true);
-
-    // 滚动到底部
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
 
-    // 直接发给 Sidecar（和桌面端小助理一样，AI 自己决定怎么处理）
-    // AI 可以通过 Bash 工具读日志、查状态、提交 Issue 等
-    if (host && token) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+    if (!baseUrl || !token) {
+      setMessages(prev => [...prev, {
+        id: `error_${Date.now()}`,
+        role: 'assistant',
+        content: '⚠️ 请先连接桌面端（首页 → 连接桌面端）。',
+        timestamp: Date.now(),
+      }]);
+      setLoading(false);
+      return;
+    }
 
-        // 获取会话列表
-        const sessionRes = await fetch(`http://${host}/api/session/list`, {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: controller.signal,
-        });
-        const { sessions } = await sessionRes.json();
-        clearTimeout(timeoutId);
+    try {
+      // 获取会话列表，找小助理会话
+      const sessRes = await fetch(`${baseUrl}/api/session/list`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const { sessions } = await sessRes.json();
 
-        // 找到小助理会话（标题包含"小助理"或"Helper"）
-        // 或者用最近的会话
-        let helperSession = sessions?.find((s: any) =>
-          s.title?.includes('小助理') || s.title?.includes('Helper') || s.title?.includes('helper')
-        ) || sessions?.sort((a: any, b: any) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0))?.[0];
+      const helperSession = sessions?.find((s: any) =>
+        s.title?.includes('小助理') || s.title?.includes('Helper')
+      ) || sessions?.[0];
 
-        if (!helperSession) {
+      if (!helperSession) {
+        setMessages(prev => [...prev, {
+          id: `error_${Date.now()}`,
+          role: 'assistant',
+          content: '⚠️ 没有可用会话，请在桌面端创建会话后重试。',
+          timestamp: Date.now(),
+        }]);
+        setLoading(false);
+        return;
+      }
+
+      // 发送消息
+      await fetch(`${baseUrl}/api/session/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sessionId: helperSession.id, message: msg }),
+      });
+      console.log(TAG, '消息已发送到会话:', helperSession.id);
+
+      // 轮询等待回复（5 次 × 2s = 10s）
+      let count = 0;
+      const poll = async () => {
+        if (count++ >= 5) {
           setMessages(prev => [...prev, {
-            id: `error_${Date.now()}`,
+            id: `reply_${Date.now()}`,
             role: 'assistant',
-            content: '⚠️ 没有可用的会话。请先在桌面端创建一个会话。',
+            content: '✅ 消息已发送。AI 回复可能需要一些时间，请在桌面端或刷新查看。',
             timestamp: Date.now(),
           }]);
           setLoading(false);
           return;
         }
-
-        // 记录发送前的总消息数
-        let preSendMsgCount = 0;
         try {
-          const ctrl0 = new AbortController();
-          const tid0 = setTimeout(() => ctrl0.abort(), 5000);
-          const preRes = await fetch(`http://${host}/api/session/messages?sessionId=${helperSession.id}`, {
+          const res = await fetch(`${baseUrl}/api/session/messages?sessionId=${helperSession.id}`, {
             headers: { Authorization: `Bearer ${token}` },
-            signal: ctrl0.signal,
           });
-          clearTimeout(tid0);
-          const preData = await preRes.json();
-          preSendMsgCount = (preData.messages || []).length;
-        } catch {}
+          const data = await res.json();
+          const msgs: any[] = data.messages || [];
+          const lastAssistant = msgs.filter((m: any) => m.role === 'assistant').pop();
 
-        // 发送消息
-        await fetch(`http://${host}/api/session/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ sessionId: helperSession.id, message: msg }),
-        });
-
-        // 等待回复（轮询，最多 15 次，每次 2 秒）
-        let retryCount = 0;
-        const maxRetries = 15;
-        const pollReply = async () => {
-          if (retryCount >= maxRetries) {
+          if (lastAssistant?.content && lastAssistant.content.trim().length > 0) {
             setMessages(prev => [...prev, {
-              id: `timeout_${Date.now()}`,
+              id: `reply_${Date.now()}`,
               role: 'assistant',
-              content: '⚠️ 回复超时，请稍后再试。',
+              content: lastAssistant.content,
               timestamp: Date.now(),
             }]);
             setLoading(false);
             return;
           }
-          retryCount++;
-          try {
-            const ctrl = new AbortController();
-            const tid = setTimeout(() => ctrl.abort(), 8000);
-            const res = await fetch(`http://${host}/api/session/messages?sessionId=${helperSession.id}`, {
-              headers: { Authorization: `Bearer ${token}` },
-              signal: ctrl.signal,
-            });
-            clearTimeout(tid);
-            const data = await res.json();
-            const allMsgs = data.messages || [];
-
-            // 检查消息数量是否增加（有新回复）
-            if (allMsgs.length > preSendMsgCount) {
-              // 找最后一条有内容的 assistant 消息
-              const assistantMsgs = allMsgs.filter((m: any) => m.role === 'assistant');
-              const lastReply = assistantMsgs[assistantMsgs.length - 1];
-
-              if (lastReply?.content && lastReply.content.trim().length > 0) {
-                setMessages(prev => [...prev, {
-                  id: `reply_${Date.now()}`,
-                  role: 'assistant',
-                  content: lastReply.content,
-                  timestamp: Date.now(),
-                }]);
-              } else {
-                // 有新消息但 content 为空（可能是纯工具调用）
-                setMessages(prev => [...prev, {
-                  id: `reply_${Date.now()}`,
-                  role: 'assistant',
-                  content: '✅ 已处理完成。',
-                  timestamp: Date.now(),
-                }]);
-              }
-              setLoading(false);
-            } else {
-              setTimeout(pollReply, 2000);
-            }
-          } catch {
-            setTimeout(pollReply, 2000);
-          }
-        };
-        setTimeout(pollReply, 2000);
-      } catch {
-        setMessages(prev => [...prev, {
-          id: `error_${Date.now()}`,
-          role: 'assistant',
-          content: '⚠️ 连接失败，请检查网络连接和 Sidecar 状态。',
-          timestamp: Date.now(),
-        }]);
-        setLoading(false);
-      }
-    } else {
+        } catch {}
+        setTimeout(poll, 2000);
+      };
+      setTimeout(poll, 2000);
+    } catch (err: any) {
+      console.error(TAG, '请求失败:', err?.message);
       setMessages(prev => [...prev, {
         id: `error_${Date.now()}`,
         role: 'assistant',
-        content: '⚠️ 请先连接到 Sidecar（返回首页 → 连接桌面端）。',
+        content: '⚠️ 请求失败，请检查连接。',
         timestamp: Date.now(),
       }]);
       setLoading(false);

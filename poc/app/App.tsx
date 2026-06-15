@@ -16,6 +16,7 @@ import { KaTeXDemo } from './src/components/KaTeXDemo';
 import { MermaidDemo } from './src/components/MermaidDemo';
 import { BashToolDemo } from './src/components/BashToolDemo';
 import { StorageService } from './src/services/StorageService';
+import { useConnectionStore } from './src/store/connectionStore';
 import { initLogger } from './src/services/MobileLogger';
 import type { RootStackParamList } from './src/navigation/AppNavigator';
 
@@ -32,6 +33,11 @@ export default function App() {
     const savedToken = StorageService.getToken();
     if (savedConnection && savedToken) {
       console.log(TAG, '恢复持久化连接:', savedConnection.host);
+      // 恢复到 Zustand store
+      useConnectionStore.getState().restoreConnection(
+        savedConnection.host, savedConnection.port, savedToken
+      );
+      // 恢复日志
       initLogger(`${savedConnection.host}:${savedConnection.port}`, savedToken);
     } else {
       console.log(TAG, '无持久化连接');

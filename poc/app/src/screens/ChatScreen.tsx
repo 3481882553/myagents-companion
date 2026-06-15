@@ -12,6 +12,7 @@ import { MarkdownRenderer } from '../components/markdown/MarkdownRenderer';
 import { ToolCallRow, ToolCallInfo } from '../components/tools/ToolCallRow';
 import { useConnectionStore } from '../store/connectionStore';
 import { useMessageStore } from '../store/messageStore';
+import { StorageService } from '../services/StorageService';
 import type { Message } from '../types/message';
 
 /** 从消息 content 中提取纯文本（支持嵌套 JSON） */
@@ -109,6 +110,7 @@ export function ChatScreen({ route, navigation }: Props) {
   const [inputText, setInputText] = useState('');
   const [displayMessages, setDisplayMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const scrollViewRef = useRef<any>(null);
   const hasScrolledToBottom = useRef(false);
   const messageCountRef = useRef(0);
@@ -140,11 +142,24 @@ export function ChatScreen({ route, navigation }: Props) {
     }
 
     const loadMsgs = async () => {
+      setLoadError(null);
       try {
+        // 先加载本地缓存
+        const cached = await StorageService.getSessionCache(sessionId);
+        if (cached.length > 0) {
+          setDisplayMessages(cached);
+        }
+        // 再从 API 加载最新
         const msgs = await loadMessagesFromApi(sessionId, host, token || '');
         setDisplayMessages(msgs);
-      } catch {
-        // 静默失败
+        // 缓存
+        StorageService.saveSessionCache(sessionId, msgs);
+      } catch (err: any) {
+        console.warn(TAG, '消息加载失败:', err?.message);
+        setLoadError('加载失败，请检查连接后下拉刷新');
+        if (displayMessages.length === 0) {
+          setDisplayMessages([]);
+        }
       } finally {
         setLoading(false);
       }
@@ -235,7 +250,11 @@ export function ChatScreen({ route, navigation }: Props) {
       >
         {filteredMessages.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>暂无消息</Text>
+            {loadError ? (
+              <Text style={styles.errorText}>{loadError}</Text>
+            ) : (
+              <Text style={styles.emptyText}>暂无消息，发送第一条消息吧</Text>
+            )}
           </View>
         ) : (
           filteredMessages.map((msg) => {
@@ -342,6 +361,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 15,
     color: '#968a7e',
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#dc2626',
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
   messageBubble: {
     marginVertical: 4,

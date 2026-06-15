@@ -83,6 +83,11 @@ export const useConnectionStore = create<ConnectionStore>((set) => ({
 
   setToken: (token) => set({ token }),
 
+  // 从持久化恢复连接（不发起网络请求）
+  restoreConnection: (host: string, port: number, token: string) => {
+    set({ host, port, token, status: 'connected', error: null });
+  },
+
   setError: (error) => set({ error, status: 'error' }),
 
   clearError: () => set({ error: null }),
