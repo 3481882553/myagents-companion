@@ -16,6 +16,14 @@
 手机端 (React Native) → HTTP → Sidecar (Node.js) → AI Provider
 ```
 
+### v0.2 架构升级
+
+- **React Navigation** — 页面栈管理，返回时恢复滚动位置
+- **Zustand** — 全局状态管理，会话/消息状态同步
+- **ApiService** — 统一数据层，前后端格式转换
+- **ErrorBoundary** — 错误边界，防止白屏崩溃
+- **StorageService** — 本地持久化（AsyncStorage + MMKV）
+
 ## 快速开始
 
 ### 前置条件
@@ -52,20 +60,30 @@ cd poc/app/android && ./gradlew.bat app:installRelease
 
 ```
 myagents-android/
-├── poc/app/                    # React Native 应用
-│   ├── src/
-│   │   ├── screens/            # 页面组件
-│   │   │   ├── HomeScreen      # 首页
-│   │   │   ├── ConnectionScreen # 连接管理
-│   │   │   ├── SessionListScreen # 会话列表
-│   │   │   ├── ChatScreen      # 聊天界面
-│   │   │   └── HelperScreen    # 小助理
-│   │   ├── components/         # 可复用组件
-│   │   │   ├── markdown/       # Markdown 渲染
-│   │   │   └── tools/          # 工具调用渲染
-│   │   ├── utils/              # 工具函数
-│   │   └── theme/              # 主题配置
-│   └── android/                # Android 原生配置
+├── src/                        # v0.2 架构源码
+│   ├── App.tsx                 # 入口（ErrorBoundary + AppNavigator）
+│   ├── navigation/             # React Navigation 配置
+│   │   ├── AppNavigator.tsx    # 主导航器
+│   │   └── LinkingConfig.ts    # 深度链接配置
+│   ├── screens/                # 页面组件（接入 Zustand store）
+│   │   ├── HomeScreen.tsx      # 首页
+│   │   ├── ConnectionScreen.tsx # 连接管理
+│   │   ├── SessionListScreen.tsx # 会话列表
+│   │   ├── ChatScreen.tsx      # 聊天界面
+│   │   └── HelperScreen.tsx    # 小助理
+│   ├── services/               # 服务层
+│   │   ├── ApiService.ts       # 统一 API（格式转换）
+│   │   └── StorageService.ts   # 本地存储
+│   ├── store/                  # Zustand 状态管理
+│   │   ├── sessionStore.ts     # 会话状态
+│   │   └── messageStore.ts     # 消息状态
+│   ├── types/                  # TypeScript 类型定义
+│   │   ├── message.ts
+│   │   ├── session.ts
+│   │   └── connection.ts
+│   └── utils/                  # 工具函数
+│       └── sessionFilter.ts    # 会话过滤
+├── poc/app/                    # React Native 应用（PoC）
 ├── v3.0-*.md                   # 设计文档
 └── README.md
 ```
@@ -74,9 +92,10 @@ myagents-android/
 
 - **框架**: React Native 0.76
 - **语言**: TypeScript
-- **状态管理**: React hooks (useState/useMemo)
-- **存储**: 内存存储 (PoC 阶段)
-- **样式**: StyleSheet
+- **导航**: React Navigation 7
+- **状态管理**: Zustand 5
+- **存储**: AsyncStorage + MMKV
+- **样式**: StyleSheet（暖色主题）
 
 ## 开发阶段
 
@@ -88,7 +107,18 @@ myagents-android/
 | W10 | 消息发送 | ✅ |
 | W6+ | 消息渲染升级 | ✅ |
 | W11 | 小助理 MVP | ✅ |
-| W12-13 | 测试 + 修复 | ✅ |
+| v0.2 | 架构升级 | ✅ |
+| W12-13 | 测试 + 修复 | ⏳ |
+
+## 测试
+
+```bash
+# 运行所有测试
+npm test
+
+# 运行 v0.2 架构测试
+npx jest src/navigation/__tests__ src/utils/__tests__ src/components/__tests__ src/store/__tests__ src/services/__tests__ --no-coverage
+```
 
 ## License
 
