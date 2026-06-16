@@ -54,7 +54,7 @@ export const useMessageStore = create<MessageStore>((set, get) => ({
     set({ loading: true });
     try {
       const { ApiService } = await import('../services/ApiService');
-      const api = new ApiService({ host, port: 32107, token });
+      const api = new ApiService({ host, port: 32102, token });
       const msgs = await api.getMessages(sessionId);
       set((state) => ({
         messages: { ...state.messages, [sessionId]: msgs },
@@ -268,7 +268,7 @@ export const useMessageStore = create<MessageStore>((set, get) => ({
   sendMessage: async (sessionId, text, host, token) => {
     try {
       const { ApiService } = await import('../services/ApiService');
-      const api = new ApiService({ host, port: 32107, token });
+      const api = new ApiService({ host, port: 32102, token });
       return await api.sendMessage(sessionId, text);
     } catch {
       return false;

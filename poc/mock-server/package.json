@@ -1,0 +1,12 @@
+{
+  "name": "myagents-mock-server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npx tsx start-mobile.ts",
+    "start:port": "npx tsx start-mobile.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0"
+  }
+}

@@ -265,7 +265,7 @@ export function ChatScreen({ route, navigation }: Props) {
         // 4. 建立 SSE 连接，实时接收回复
         const currentMessageId = { current: assistantMsgId };
         const sseClient = new SseClient({
-          url: `http://${host}/api/session/stream?id=${sessionId}`,
+          url: `http://${host}/api/session/stream?sessionId=${sessionId}`,
           token,
         });
 

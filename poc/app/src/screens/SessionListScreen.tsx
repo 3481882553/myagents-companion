@@ -48,7 +48,7 @@ export function SessionListScreen({ navigation }: Props) {
 
     console.log(TAG, '开始加载会话...');
     try {
-      const api = new ApiService({ host: effectiveHost, port: 32107, token: effectiveToken || '' });
+      const api = new ApiService({ host: effectiveHost, port: 32102, token: effectiveToken || '' });
       const sessionList = await api.getSessions();
       console.log(TAG, '加载成功:', sessionList.length, '个会话');
       setSessions(sessionList);
