@@ -4,9 +4,10 @@
  */
 
 import React from 'react';
-import { StyleSheet, useColorScheme } from 'react-native';
+import { StyleSheet, useColorScheme, Text } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { lightTokens, darkTokens } from '../../theme/tokens';
+import { CodeBlock } from './CodeBlock';
 
 interface MarkdownRendererProps {
   content: string;
@@ -108,6 +109,23 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
         s: { color: tokens.inkMuted, textDecorationLine: 'line-through' },
         em: { fontStyle: 'italic' },
         strong: { fontWeight: '700' },
+      }}
+      rules={{
+        // 代码块（fence）：委托给 CodeBlock 组件，提供语言标签+复制+行号+折叠
+        fence: (node: any, _children: any, _parent: any, _styles: any) => {
+          const language = node.sourceInfo || undefined;
+          const code = node.content;
+          const lines = code.split('\n').length;
+          return (
+            <CodeBlock
+              key={node.key}
+              language={language}
+              code={code}
+              collapsible={lines > 30}
+              showLineNumbers={lines > 5}
+            />
+          );
+        },
       }}
     >
       {content}
