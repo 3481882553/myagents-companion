@@ -187,9 +187,16 @@ export class SseClient {
       this._retryDelay = this.options.initialRetryDelay || 500;
     });
 
-    this.eventSource.addEventListener('message', (event: any) => {
-      this.handleMessage(event);
-    });
+    // 为所有已知事件类型注册监听器（react-native-sse 按类型分发，不注册就丢弃）
+    const allEventTypes = new Set([
+      'message',
+      ...Object.keys(EVENT_PRIORITY_MAP),
+    ]);
+    for (const eventType of allEventTypes) {
+      this.eventSource.addEventListener(eventType, (event: any) => {
+        this.handleMessage(event);
+      });
+    }
 
     this.eventSource.addEventListener('error', () => {
       this.handleError();
