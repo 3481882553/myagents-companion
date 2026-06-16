@@ -6,6 +6,9 @@
  */
 
 import { EventCoalescer, SSEEvent } from './event-coalescer';
+import { logInfo, logWarn } from '../utils/log';
+
+const TAG = 'SseClient';
 
 export enum ConnectionState {
   DISCONNECTED = 'disconnected',
@@ -131,10 +134,12 @@ export class SseClient {
     }
 
     this._state = ConnectionState.CONNECTING;
+    logInfo(TAG, `connect: ${this.options.url}`);
     this.createEventSource();
   }
 
   disconnect() {
+    logInfo(TAG, `disconnect`);
     this._state = ConnectionState.DISCONNECTED;
     this.coalescer.reset();
     if (this.reconnectTimer) {
@@ -176,6 +181,7 @@ export class SseClient {
     });
 
     this.eventSource.addEventListener('open', () => {
+      logInfo(TAG, 'SSE 已连接');
       this._state = ConnectionState.CONNECTED;
       this.retryCount = 0;
       this._retryDelay = this.options.initialRetryDelay || 500;
@@ -209,6 +215,12 @@ export class SseClient {
     // 按优先级处理
     const priority = EVENT_PRIORITY_MAP[eventType] || 'critical';
 
+    // 关键事件记录日志（排除高频的 message-chunk 和 thinking-chunk）
+    if (priority === 'critical' && eventType !== 'chat:message-chunk') {
+      const preview = typeof data === 'string' ? data.slice(0, 50) : '';
+      logInfo(TAG, `${eventType}: ${preview || JSON.stringify(data || {}).slice(0, 50)}`);
+    }
+
     switch (priority) {
       case 'critical':
         this.dispatchEvent(event);
@@ -231,6 +243,7 @@ export class SseClient {
 
     this._state = ConnectionState.RETRYING;
     this.retryCount++;
+    logWarn(TAG, `error: 连接中断，重试 ${this.retryCount}/${this.options.maxRetries || 10}`);
 
     if (this.retryCount > (this.options.maxRetries || 10)) {
       this._state = ConnectionState.DISCONNECTED;

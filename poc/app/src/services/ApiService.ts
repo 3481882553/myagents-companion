@@ -7,6 +7,9 @@ import type { ConnectionConfig } from '../types/connection';
 import type { Session } from '../types/session';
 import type { Message, ToolCall } from '../types/message';
 import { filterUserSessions } from '../utils/sessionFilter';
+import { logInfo, logError } from '../utils/log';
+
+const TAG = 'ApiService';
 
 export class ApiService {
   private baseUrl: string;
@@ -200,23 +203,36 @@ export class ApiService {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    const start = Date.now();
+    const url = `${this.baseUrl}${path}`;
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' })) as any;
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+      });
 
-      if (response.status === 401) {
-        this.onTokenExpired?.();
-        throw new Error(error.error || 'Unauthorized');
+      const duration = Date.now() - start;
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' })) as any;
+        logError(TAG, `${method} ${path} ${duration}ms ${response.status} ${error.error || ''}`);
+
+        if (response.status === 401) {
+          this.onTokenExpired?.();
+          throw new Error(error.error || 'Unauthorized');
+        }
+
+        throw new Error(error.error || `HTTP ${response.status}`);
       }
 
-      throw new Error(error.error || `HTTP ${response.status}`);
+      logInfo(TAG, `${method} ${path} ${duration}ms ${response.status}`);
+      return response.json() as Promise<T>;
+    } catch (err: any) {
+      const duration = Date.now() - start;
+      logError(TAG, `${method} ${path} ${duration}ms ${err?.name || 'Error'}: ${err?.message || err}`);
+      throw err;
     }
-
-    return response.json() as Promise<T>;
   }
 }

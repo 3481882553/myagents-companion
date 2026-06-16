@@ -4,6 +4,9 @@
  */
 
 import { create } from 'zustand';
+import { logInfo, logError } from '../utils/log';
+
+const TAG = 'connectionStore';
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'reconnecting';
 
@@ -34,27 +37,42 @@ export const useConnectionStore = create<ConnectionStore>((set) => ({
   error: null,
 
   connect: async (host, port, pairCode) => {
+    logInfo(TAG, `connect: ${host}:${port} code=${pairCode}`);
     set({ status: 'connecting', error: null });
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       // 健康检查
+      const healthStart = Date.now();
       const healthRes = await fetch(`http://${host}:${port}/health/live`, {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
+      const healthDuration = Date.now() - healthStart;
 
-      if (!healthRes.ok) throw new Error('连接失败');
+      if (!healthRes.ok) {
+        logError(TAG, `health: ${healthRes.status} ${healthDuration}ms`);
+        throw new Error(`连接失败 (HTTP ${healthRes.status})`);
+      }
+      logInfo(TAG, `health: OK ${healthDuration}ms`);
 
       // 配对获取 Token
+      const pairStart = Date.now();
       const pairRes = await fetch(`http://${host}:${port}/api/pair`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: pairCode }),
       });
-      const { token } = await pairRes.json();
+      const pairDuration = Date.now() - pairStart;
+      const { token, error: pairError } = await pairRes.json();
 
+      if (pairError || !token) {
+        logError(TAG, `pair: 失败 ${pairDuration}ms ${pairError || 'no token'}`);
+        throw new Error(pairError || '配对失败');
+      }
+
+      logInfo(TAG, `pair: 成功 ${pairDuration}ms`);
       set({
         host,
         port,
@@ -63,9 +81,11 @@ export const useConnectionStore = create<ConnectionStore>((set) => ({
         error: null,
       });
     } catch (err: any) {
+      const errMsg = err?.message || '连接失败';
+      logError(TAG, `connect: 失败 ${errMsg}`);
       set({
         status: 'error',
-        error: err.message || '连接失败',
+        error: errMsg,
       });
       throw err;
     }

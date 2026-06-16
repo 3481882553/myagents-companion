@@ -6,6 +6,9 @@
 
 import { SidecarHttpApi } from './sidecar-api';
 import { AuthService } from './auth';
+import { logInfo, logError, logWarn } from '../utils/log';
+
+const TAG = 'ConnectionManager';
 
 export enum ConnectionState {
   DISCONNECTED = 'disconnected',
@@ -53,6 +56,7 @@ export class ConnectionManager {
 
     this._state = ConnectionState.CONNECTING;
     this.options.onStateChange?.(this._state);
+    logInfo(TAG, `connect: ${host}`);
 
     // 更新 API base URL
     (this.api as any).baseUrl = `http://${host}`;
@@ -61,17 +65,25 @@ export class ConnectionManager {
     const storedToken = await this.auth.getStoredToken();
     if (storedToken) {
       this.api.setToken(storedToken);
+      logDebug(TAG, '使用已存储的 Token');
     }
 
-    // 尝试连接
+    // 健康检查
+    const start = Date.now();
     try {
       await this.api.get('/health/live');
+      const duration = Date.now() - start;
+      logInfo(TAG, `health: OK ${duration}ms`);
       this._state = ConnectionState.CONNECTED;
       this.retryCount = 0;
       this._retryDelay = this.options.initialRetryDelay || 500;
       this.options.onStateChange?.(this._state);
       this.options.onConnected?.();
-    } catch {
+    } catch (err: any) {
+      const duration = Date.now() - start;
+      const errType = err?.name || 'Unknown';
+      const errMsg = err?.message || String(err);
+      logError(TAG, `health: FAILED ${duration}ms ${errType}: ${errMsg}`);
       this._state = ConnectionState.RETRYING;
       this.options.onStateChange?.(this._state);
       this.scheduleReconnect();
@@ -80,6 +92,7 @@ export class ConnectionManager {
 
   /** 断开连接 */
   disconnect(): void {
+    logInfo(TAG, `disconnect (state: ${this._state})`);
     this._state = ConnectionState.DISCONNECTED;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -103,6 +116,7 @@ export class ConnectionManager {
     this.retryCount++;
 
     if (this.retryCount > maxRetries) {
+      logWarn(TAG, `reconnect: 超过最大重试次数 ${maxRetries}`);
       this._state = ConnectionState.DISCONNECTED;
       this.options.onStateChange?.(this._state);
       return;
@@ -113,6 +127,8 @@ export class ConnectionManager {
       this._retryDelay * 2,
       this.options.maxRetryDelay || 30000
     );
+
+    logInfo(TAG, `reconnect: 第 ${this.retryCount}/${maxRetries} 次，${this._retryDelay}ms 后重试`);
 
     this.reconnectTimer = setTimeout(() => {
       this._state = ConnectionState.CONNECTING;
@@ -125,12 +141,14 @@ export class ConnectionManager {
   private async attemptReconnect(): Promise<void> {
     try {
       await this.api.get('/health/live');
+      logInfo(TAG, `reconnect: 成功`);
       this._state = ConnectionState.CONNECTED;
       this.retryCount = 0;
       this._retryDelay = this.options.initialRetryDelay || 500;
       this.options.onStateChange?.(this._state);
       this.options.onConnected?.();
-    } catch {
+    } catch (err: any) {
+      logWarn(TAG, `reconnect: 失败 ${err?.message || err}`);
       this._state = ConnectionState.RETRYING;
       this.options.onStateChange?.(this._state);
       this.scheduleReconnect();
