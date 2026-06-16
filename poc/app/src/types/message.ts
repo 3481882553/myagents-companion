@@ -12,7 +12,7 @@ export interface Message {
   toolCalls?: ToolCall[];
   thinking?: string;
   createdAt: number;
-  status: 'sending' | 'sent' | 'error';
+  status: 'sending' | 'sent' | 'error' | 'streaming';
 }
 
 export interface ToolCall {

@@ -4,16 +4,49 @@
  * 功能：消息列表 + 输入框 + SSE 流式渲染
  */
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Platform } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { MarkdownRenderer } from '../components/markdown/MarkdownRenderer';
+import { StreamingMessageRenderer } from '../components/markdown/StreamingMessageRenderer';
 import { ToolCallRow, ToolCallInfo } from '../components/tools/ToolCallRow';
 import { useConnectionStore } from '../store/connectionStore';
 import { useMessageStore } from '../store/messageStore';
 import { StorageService } from '../services/StorageService';
+import { SseClient } from '../services/sse-client';
+import { sseEventToStoreAction } from '../services/sse-event-handler';
 import type { Message } from '../types/message';
+
+/** 可折叠思考块 */
+function ThinkingBlock({ thinking }: { thinking: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const preview = thinking.slice(0, 100);
+  return (
+    <TouchableOpacity
+      onPress={() => setExpanded(!expanded)}
+      style={thinkingStyles.block}
+    >
+      <Text style={thinkingStyles.label}>
+        {expanded ? '🔽 思考过程' : '▶ 思考过程'} — {preview}{!expanded && thinking.length > 100 ? '...' : ''}
+      </Text>
+      {expanded && <Text style={thinkingStyles.text}>{thinking}</Text>}
+    </TouchableOpacity>
+  );
+}
+
+const thinkingStyles = StyleSheet.create({
+  block: {
+    backgroundColor: 'rgba(28, 22, 18, 0.04)',
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 4,
+    borderLeftWidth: 3,
+    borderLeftColor: '#968a7e',
+  },
+  label: { fontSize: 12, color: '#968a7e', fontStyle: 'italic' },
+  text: { fontSize: 13, color: '#6f6156', fontStyle: 'italic', lineHeight: 18, marginTop: 6 },
+});
 
 /** 从消息 content 中提取纯文本（支持嵌套 JSON） */
 function extractText(content: any): string {
@@ -108,62 +141,77 @@ const TAG = '[ChatScreen]';
 export function ChatScreen({ route, navigation }: Props) {
   const { sessionId } = route.params;
   const [inputText, setInputText] = useState('');
-  const [displayMessages, setDisplayMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const scrollViewRef = useRef<any>(null);
   const hasScrolledToBottom = useRef(false);
   const messageCountRef = useRef(0);
 
+  // 从 store 读取消息（替代本地 displayMessages state）
+  const storeMessages = useMessageStore(state => state.messages[sessionId]) || [];
+
   const { host, token } = useConnectionStore();
   const { loadMessagesFromApi, sendMessage, loadMessages } = useMessageStore();
+  const sseClientRef = useRef<SseClient | null>(null);
+
+  /** 添加消息到 store（封装 appendMessage） */
+  const appendToStore = useCallback((sid: string, msg: Message) => {
+    useMessageStore.getState().appendMessage(sid, msg);
+  }, []);
+
+  // 卸载时断开 SSE
+  useEffect(() => {
+    return () => {
+      if (sseClientRef.current) {
+        console.log(TAG, '断开 SSE 连接');
+        sseClientRef.current.disconnect();
+        sseClientRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     console.log(TAG, '屏幕已挂载, sessionId:', sessionId, 'host:', host || '(未设置)');
     return () => console.log(TAG, '屏幕将卸载, sessionId:', sessionId);
   }, [sessionId]);
 
-  // 过滤消息
+  // 过滤消息（从 store 读取）
   const filteredMessages = useMemo(() => {
-    return displayMessages.filter(msg => {
-      // 保留有内容、有工具调用、或有思考过程的消息
+    return storeMessages.filter(msg => {
       const hasContent = msg.content && msg.content.trim() !== '';
       const hasTools = (msg.toolCalls || []).length > 0;
       const hasThinking = !!msg.thinking;
       if (!hasContent && !hasTools && !hasThinking) return false;
-      // 过滤 system 命令消息
       if (msg.content?.startsWith('<command-name>') || msg.content?.startsWith('<local-command-')) return false;
       return true;
     });
-  }, [displayMessages]);
+  }, [storeMessages]);
 
-  // 加载消息
+  // 首次加载：从 API 获取历史消息
   useEffect(() => {
     if (!host) {
-      setDisplayMessages([]);
+      useMessageStore.getState().clearMessages(sessionId);
       setLoading(false);
       return;
     }
 
     const loadMsgs = async () => {
       setLoadError(null);
+      setLoading(true);
       try {
         // 先加载本地缓存
         const cached = await StorageService.getSessionCache(sessionId);
         if (cached.length > 0) {
-          setDisplayMessages(cached);
+          useMessageStore.getState().loadMessages(sessionId, cached);
         }
         // 再从 API 加载最新
         const msgs = await loadMessagesFromApi(sessionId, host, token || '');
-        setDisplayMessages(msgs);
+        useMessageStore.getState().loadMessages(sessionId, msgs);
         // 缓存
         StorageService.saveSessionCache(sessionId, msgs);
       } catch (err: any) {
         console.warn(TAG, '消息加载失败:', err?.message);
         setLoadError('加载失败，请检查连接后下拉刷新');
-        if (displayMessages.length === 0) {
-          setDisplayMessages([]);
-        }
       } finally {
         setLoading(false);
       }
@@ -187,35 +235,68 @@ export function ChatScreen({ route, navigation }: Props) {
       status: 'sent',
     };
 
-    // 立即显示用户消息
-    setDisplayMessages(prev => [...prev, userMessage]);
+    // 1. 添加用户消息到 store
+    appendToStore(sessionId, userMessage);
     setInputText('');
-    console.log(TAG, '用户消息已添加到本地:', userMessage.id);
 
-    // 使用 messageStore 发送消息
+    // 2. 如果已连接，发送到 Sidecar 并建立 SSE 流
     if (host && token) {
       try {
         console.log(TAG, '发送到 Sidecar...');
-        await sendMessage(sessionId, text, host, token);
-        console.log(TAG, '发送成功, 等待回复...');
-        // 轮询获取最新消息
-        setTimeout(async () => {
-          try {
-            const msgs = await loadMessagesFromApi(sessionId, host, token);
-            console.log(TAG, '轮询获取到', msgs.length, '条消息');
-            setDisplayMessages(msgs);
-          } catch (err: any) {
-            console.error(TAG, '轮询失败:', err?.message);
-          }
-        }, 3000);
+        const ok = await sendMessage(sessionId, text, host, token);
+        if (!ok) {
+          console.warn(TAG, '发送失败');
+          return;
+        }
+        console.log(TAG, '发送成功, 建立 SSE 连接...');
+
+        // 3. 创建 assistant 占位消息
+        const assistantMsgId = `assistant_${Date.now()}`;
+        appendToStore(sessionId, {
+          id: assistantMsgId,
+          sessionId,
+          role: 'assistant',
+          content: '',
+          createdAt: Date.now(),
+          status: 'streaming',
+        });
+
+        // 4. 建立 SSE 连接，实时接收回复
+        const currentMessageId = { current: assistantMsgId };
+        const sseClient = new SseClient({
+          url: `http://${host}/api/session/stream?id=${sessionId}`,
+          token,
+        });
+
+        // 注册事件处理器
+        const handleSseEvent = (event: any) => {
+          sseEventToStoreAction(
+            event,
+            useMessageStore.getState(),
+            sessionId,
+            currentMessageId,
+          );
+        };
+
+        // 注册所有 critical + coalescible 事件
+        const criticalEvents = [
+          'chat:message-chunk', 'chat:message-complete', 'chat:message-error',
+          'chat:tool-use-start', 'chat:tool-result-delta', 'chat:tool-result-complete',
+          'chat:thinking-start', 'chat:thinking-chunk', 'chat:message-stopped',
+        ];
+        criticalEvents.forEach(evt => sseClient.on(evt, handleSseEvent));
+
+        sseClient.connect();
+
+        // 存储以便卸载时断开
+        sseClientRef.current = sseClient;
+
       } catch (err: any) {
         console.error(TAG, '发送失败:', err?.message);
       }
     } else {
       console.warn(TAG, '未连接, 消息仅保存在本地');
     }
-
-    // 消息已通过 store 发送
   };
 
   return (
@@ -266,7 +347,7 @@ export function ChatScreen({ route, navigation }: Props) {
               // 映射 ToolCall → ToolCallInfo（status→state, output→result）
               const msgTools: ToolCallInfo[] = (msg.toolCalls || []).map((tc: any) => ({
                 name: tc.name || 'Unknown',
-                input: tc.input || '',
+                input: typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input || {}),
                 state: tc.status || 'completed',
                 result: tc.output,
               }));
@@ -281,19 +362,24 @@ export function ChatScreen({ route, navigation }: Props) {
 
               // assistant 消息
               const hasToolsOrThinking = msgTools.length > 0 || msg.thinking;
+              const isStreaming = msg.status === 'streaming';
 
               return (
                 <View key={msg.id} testID="assistant-message" style={styles.assistantBubble}>
-                  {msg.content ? <MarkdownRenderer content={msg.content} /> : null}
+                  {msg.content ? (
+                    isStreaming ? (
+                      <StreamingMessageRenderer text={msg.content} isStreaming={true} />
+                    ) : (
+                      <MarkdownRenderer content={msg.content} />
+                    )
+                  ) : null}
                   {hasToolsOrThinking && !msg.content && (
                     <Text style={{ fontSize: 13, color: '#968a7e', fontStyle: 'italic' }}>
                       🤔 思考中...
                     </Text>
                   )}
                   {msg.thinking ? (
-                    <View style={styles.thinkingBlock}>
-                      <Text style={styles.thinkingText} numberOfLines={5}>{msg.thinking}</Text>
-                    </View>
+                    <ThinkingBlock thinking={msg.thinking} />
                   ) : null}
                   {msgTools.map((tool: ToolCallInfo, i: number) => (
                     <ToolCallRow key={`tool-${i}`} tool={tool} />

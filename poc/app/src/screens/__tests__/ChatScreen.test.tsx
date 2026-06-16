@@ -19,16 +19,52 @@ jest.mock('react-native', () => ({
   Platform: { OS: 'android' },
 }));
 
+jest.mock('react-native-markdown-display', () => 'Markdown');
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  default: {
+    getItem: jest.fn(),
+    setItem: jest.fn(),
+    removeItem: jest.fn(),
+    clear: jest.fn(),
+  },
+}));
+jest.mock('../../services/StorageService', () => ({
+  StorageService: {
+    getSessionCache: jest.fn(() => Promise.resolve([])),
+    saveSessionCache: jest.fn(),
+  },
+}));
 jest.mock('../../store/connectionStore', () => ({
   useConnectionStore: () => ({ host: null, token: null }),
 }));
 jest.mock('../../store/messageStore', () => ({
-  useMessageStore: () => ({
-    messages: {},
-    loadMessages: jest.fn(),
-    loadMessagesFromApi: jest.fn(() => Promise.resolve([])),
-    sendMessage: jest.fn(),
-  }),
+  useMessageStore: (selector?: any) => {
+    const state = {
+      messages: {},
+      loadMessages: jest.fn(),
+      loadMessagesFromApi: jest.fn(() => Promise.resolve([])),
+      sendMessage: jest.fn(),
+      appendMessage: jest.fn(),
+      clearMessages: jest.fn(),
+      getState: () => state,
+    };
+    return selector ? selector(state) : state;
+  },
+}));
+jest.mock('../../services/sse-client', () => ({
+  SseClient: jest.fn().mockImplementation(() => ({
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    on: jest.fn(),
+    off: jest.fn(),
+    state: 'disconnected',
+  })),
+}));
+jest.mock('../../services/sse-event-handler', () => ({
+  sseEventToStoreAction: jest.fn(),
+}));
+jest.mock('../../components/markdown/StreamingMessageRenderer', () => ({
+  StreamingMessageRenderer: 'StreamingMessageRenderer',
 }));
 
 import { ChatScreen } from '../ChatScreen';
