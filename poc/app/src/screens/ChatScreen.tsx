@@ -11,6 +11,7 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import { MarkdownRenderer } from '../components/markdown/MarkdownRenderer';
 import { StreamingMessageRenderer } from '../components/markdown/StreamingMessageRenderer';
 import { ToolCallRow, ToolCallInfo } from '../components/tools/ToolCallRow';
+import { WidgetRenderer } from '../components/tools/WidgetRenderer';
 import { useConnectionStore } from '../store/connectionStore';
 import { useMessageStore } from '../store/messageStore';
 import { StorageService } from '../services/StorageService';
@@ -34,6 +35,29 @@ function ThinkingBlock({ thinking }: { thinking: string }) {
       {expanded && <Text style={thinkingStyles.text}>{thinking}</Text>}
     </TouchableOpacity>
   );
+}
+
+/** 解析消息内容，分离文本和 Widget */
+function parseContentWithWidgets(content: string): { type: 'text' | 'widget'; value: string }[] {
+  if (!content) return [];
+  const segments: { type: 'text' | 'widget'; value: string }[] = [];
+  const regex = /<generative-ui-widget[^>]*>([\s\S]*?)<\/generative-ui-widget>/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    // Widget 前面的文本
+    if (match.index > lastIndex) {
+      segments.push({ type: 'text', value: content.slice(lastIndex, match.index) });
+    }
+    // Widget 内容
+    segments.push({ type: 'widget', value: match[1] });
+    lastIndex = match.index + match[0].length;
+  }
+  // Widget 后面的文本
+  if (lastIndex < content.length) {
+    segments.push({ type: 'text', value: content.slice(lastIndex) });
+  }
+  return segments;
 }
 
 const thinkingStyles = StyleSheet.create({
@@ -330,15 +354,21 @@ export function ChatScreen({ route, navigation }: Props) {
             const hasToolsOrThinking = msgTools.length > 0 || msg.thinking;
             const isStreaming = msg.status === 'streaming';
 
+            // 解析内容：分离文本和 Widget
+            const contentSegments = msg.content ? parseContentWithWidgets(msg.content) : [];
+
             return (
               <View testID="assistant-message" style={styles.assistantBubble}>
-                {msg.content ? (
-                  isStreaming ? (
-                    <StreamingMessageRenderer text={msg.content} isStreaming={true} />
+                {contentSegments.map((seg, i) => {
+                  if (seg.type === 'widget') {
+                    return <WidgetRenderer key={`widget-${i}`} widgetHtml={seg.value} />;
+                  }
+                  return isStreaming ? (
+                    <StreamingMessageRenderer key={`text-${i}`} text={seg.value} isStreaming={true} />
                   ) : (
-                    <MarkdownRenderer content={msg.content} />
-                  )
-                ) : null}
+                    <MarkdownRenderer key={`text-${i}`} content={seg.value} />
+                  );
+                })}
                 {hasToolsOrThinking && !msg.content && (
                   <Text style={{ fontSize: 13, color: '#968a7e', fontStyle: 'italic' }}>
                     🤔 思考中...
