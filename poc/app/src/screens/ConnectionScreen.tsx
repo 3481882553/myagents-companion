@@ -20,7 +20,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Connection'>;
 
 export function ConnectionScreen({ navigation }: Props) {
   const [host, setHost] = useState('');
-  const [port, setPort] = useState('32102');
+  const [port, setPort] = useState('32103');
   const [pairCode, setPairCode] = useState('');
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [error, setError] = useState('');
@@ -41,7 +41,7 @@ export function ConnectionScreen({ navigation }: Props) {
 
     try {
       const [h, p] = fullHost.split(':');
-      await connect(h, parseInt(p) || 32102, code);
+      await connect(h, parseInt(p) || 32103, code);
       setStatus('connected');
       await saveConnectionHistory(fullHost, code);
       setHistory(await getConnectionHistory());
@@ -50,7 +50,7 @@ export function ConnectionScreen({ navigation }: Props) {
 
       // 持久化连接配置
       if (token) {
-        StorageService.saveConnection({ host: h, port: parseInt(p) || 32102, token });
+        StorageService.saveConnection({ host: h, port: parseInt(p) || 32103, token });
         StorageService.saveToken(token);
         console.log(TAG, '连接配置已持久化');
       }

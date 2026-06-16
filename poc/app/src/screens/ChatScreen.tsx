@@ -151,6 +151,7 @@ export function ChatScreen({ route, navigation }: Props) {
   const storeMessages = useMessageStore(state => state.messages[sessionId]) || [];
 
   const { host, token } = useConnectionStore();
+  const port = useConnectionStore(state => state.port);
   const { loadMessagesFromApi, sendMessage, loadMessages } = useMessageStore();
   const { tokens, isDark } = useTheme();
   const sseClientRef = useRef<SseClient | null>(null);
@@ -265,7 +266,7 @@ export function ChatScreen({ route, navigation }: Props) {
         // 4. 建立 SSE 连接，实时接收回复
         const currentMessageId = { current: assistantMsgId };
         const sseClient = new SseClient({
-          url: `http://${host}/api/session/stream?sessionId=${sessionId}`,
+          url: `http://${host}:${port}/api/session/stream?sessionId=${sessionId}`,
           token,
         });
 

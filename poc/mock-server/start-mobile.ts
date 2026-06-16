@@ -160,21 +160,36 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
       Connection: 'keep-alive',
     });
 
-    // 发送 system-init
-    sendSSE(res, 'chat:system-init', { status: 'ready' });
-    await sleep(200);
+    try {
+      // 发送 system-init
+      sendSSE(res, 'chat:system-init', { status: 'ready' });
 
-    // 模拟流式消息
-    const demoText = '这是一个 **Mock Server** 的演示回复。\n\n```javascript\nconst greeting = "Hello from Mock Server!";\nconsole.log(greeting);\n```\n\n支持 **Markdown** 和代码高亮！';
-    const chunks = demoText.split(' ');
+      // 模拟流式消息（不 await，用 setTimeout 实现）
+      const demoText = '这是一个 **Mock Server** 的演示回复。\n\n```javascript\nconst greeting = "Hello from Mock Server!";\nconsole.log(greeting);\n```\n\n支持 **Markdown** 和代码高亮！';
+      const chunks = demoText.split(' ');
 
-    for (const chunk of chunks) {
-      sendSSE(res, 'chat:message-chunk', { text: chunk + ' ' });
-      await sleep(80);
+      let i = 0;
+      const sendChunk = () => {
+        if (i >= chunks.length) {
+          sendSSE(res, 'chat:message-complete', {});
+          return;
+        }
+        if (res.writableEnded) return;
+        sendSSE(res, 'chat:message-chunk', { text: chunks[i] + ' ' });
+        i++;
+        setTimeout(sendChunk, 80);
+      };
+      setTimeout(sendChunk, 200);
+
+      req.on('close', () => {
+        console.log('[mock-server] SSE client disconnected');
+      });
+    } catch (err: any) {
+      console.error('[mock-server] SSE error:', err.message);
+      if (!res.writableEnded) {
+        res.end();
+      }
     }
-
-    sendSSE(res, 'chat:message-complete', {});
-    req.on('close', () => console.log('[mock-server] SSE client disconnected'));
     return;
   }
 

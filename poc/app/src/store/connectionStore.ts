@@ -31,7 +31,7 @@ export type ConnectionStore = ConnectionState & ConnectionActions;
 // 单例 store
 export const useConnectionStore = create<ConnectionStore>((set) => ({
   host: null,
-  port: 32102,
+  port: 32103,
   token: null,
   status: 'disconnected',
   error: null,
@@ -94,7 +94,7 @@ export const useConnectionStore = create<ConnectionStore>((set) => ({
   disconnect: () => {
     set({
       host: null,
-      port: 32102,
+      port: 32103,
       token: null,
       status: 'disconnected',
       error: null,
