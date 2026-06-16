@@ -13,6 +13,7 @@ jest.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',
   ScrollView: 'ScrollView',
+  FlatList: 'FlatList',
   TouchableOpacity: 'TouchableOpacity',
   TextInput: 'TextInput',
   SafeAreaView: 'SafeAreaView',
@@ -20,6 +21,9 @@ jest.mock('react-native', () => ({
 }));
 
 jest.mock('react-native-markdown-display', () => 'Markdown');
+jest.mock('@react-native-clipboard/clipboard', () => ({
+  default: { setString: jest.fn(), getString: () => Promise.resolve('') },
+}));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   default: {
     getItem: jest.fn(),

@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, TextInput, Platform } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { MarkdownRenderer } from '../components/markdown/MarkdownRenderer';
@@ -16,6 +16,7 @@ import { useMessageStore } from '../store/messageStore';
 import { StorageService } from '../services/StorageService';
 import { SseClient } from '../services/sse-client';
 import { sseEventToStoreAction } from '../services/sse-event-handler';
+import { useTheme } from '../theme/useTheme';
 import type { Message } from '../types/message';
 
 /** 可折叠思考块 */
@@ -143,15 +144,15 @@ export function ChatScreen({ route, navigation }: Props) {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const scrollViewRef = useRef<any>(null);
+  const flatListRef = useRef<FlatList<any>>(null);
   const hasScrolledToBottom = useRef(false);
-  const messageCountRef = useRef(0);
 
   // 从 store 读取消息（替代本地 displayMessages state）
   const storeMessages = useMessageStore(state => state.messages[sessionId]) || [];
 
   const { host, token } = useConnectionStore();
   const { loadMessagesFromApi, sendMessage, loadMessages } = useMessageStore();
+  const { tokens, isDark } = useTheme();
   const sseClientRef = useRef<SseClient | null>(null);
 
   /** 添加消息到 store（封装 appendMessage） */
@@ -300,40 +301,73 @@ export function ChatScreen({ route, navigation }: Props) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: tokens.paper }]}>
       {/* 标题栏由 React Navigation 提供 */}
 
-      {/* 消息列表 */}
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.messageList}
-        contentContainerStyle={styles.messageListContent}
-        onContentSizeChange={(w, h) => {
-          if (filteredMessages.length === 0) return;
+      {/* 消息列表 — FlatList 虚拟化 */}
+      <FlatList
+        ref={flatListRef}
+        data={filteredMessages}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item: msg }) => {
+          try {
+            const msgTools: ToolCallInfo[] = (msg.toolCalls || []).map((tc: any) => ({
+              name: tc.name || 'Unknown',
+              input: typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input || {}),
+              state: tc.status || 'completed',
+              result: tc.output,
+            }));
 
-          const prevCount = messageCountRef.current;
-          const newCount = filteredMessages.length;
-          messageCountRef.current = newCount;
+            if (msg.role === 'user') {
+              return (
+                <View testID="user-message" style={[styles.messageBubble, styles.userBubble]}>
+                  <MarkdownRenderer content={msg.content} />
+                </View>
+              );
+            }
 
-          if (!hasScrolledToBottom.current) {
-            // 首次加载：等布局稳定后直接跳到底部（无动画）
-            // 多次尝试确保生效
-            setTimeout(() => {
-              scrollViewRef.current?.scrollToEnd({ animated: false });
-              hasScrolledToBottom.current = true;
-            }, 50);
-            setTimeout(() => {
-              scrollViewRef.current?.scrollToEnd({ animated: false });
-            }, 200);
-          } else if (newCount > prevCount) {
-            // 新消息到来：平滑滚动到底部
-            setTimeout(() => {
-              scrollViewRef.current?.scrollToEnd({ animated: true });
-            }, 50);
+            const hasToolsOrThinking = msgTools.length > 0 || msg.thinking;
+            const isStreaming = msg.status === 'streaming';
+
+            return (
+              <View testID="assistant-message" style={styles.assistantBubble}>
+                {msg.content ? (
+                  isStreaming ? (
+                    <StreamingMessageRenderer text={msg.content} isStreaming={true} />
+                  ) : (
+                    <MarkdownRenderer content={msg.content} />
+                  )
+                ) : null}
+                {hasToolsOrThinking && !msg.content && (
+                  <Text style={{ fontSize: 13, color: '#968a7e', fontStyle: 'italic' }}>
+                    🤔 思考中...
+                  </Text>
+                )}
+                {msg.thinking ? (
+                  <ThinkingBlock thinking={msg.thinking} />
+                ) : null}
+                {msgTools.map((tool: ToolCallInfo, i: number) => (
+                  <ToolCallRow key={`tool-${i}`} tool={tool} />
+                ))}
+              </View>
+            );
+          } catch (e) {
+            return (
+              <View style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
+                <Text style={{ fontSize: 13, color: '#1c1612' }}>{msg.content.slice(0, 500)}</Text>
+              </View>
+            );
           }
         }}
-      >
-        {filteredMessages.length === 0 ? (
+        style={styles.messageList}
+        contentContainerStyle={styles.messageListContent}
+        // 虚拟化参数
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={true}
+        // 空状态
+        ListEmptyComponent={
           <View style={styles.emptyState}>
             {loadError ? (
               <Text style={styles.errorText}>{loadError}</Text>
@@ -341,64 +375,26 @@ export function ChatScreen({ route, navigation }: Props) {
               <Text style={styles.emptyText}>暂无消息，发送第一条消息吧</Text>
             )}
           </View>
-        ) : (
-          filteredMessages.map((msg) => {
-            try {
-              // 映射 ToolCall → ToolCallInfo（status→state, output→result）
-              const msgTools: ToolCallInfo[] = (msg.toolCalls || []).map((tc: any) => ({
-                name: tc.name || 'Unknown',
-                input: typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input || {}),
-                state: tc.status || 'completed',
-                result: tc.output,
-              }));
-
-              if (msg.role === 'user') {
-                return (
-                  <View key={msg.id} testID="user-message" style={[styles.messageBubble, styles.userBubble]}>
-                    <MarkdownRenderer content={msg.content} />
-                  </View>
-                );
-              }
-
-              // assistant 消息
-              const hasToolsOrThinking = msgTools.length > 0 || msg.thinking;
-              const isStreaming = msg.status === 'streaming';
-
-              return (
-                <View key={msg.id} testID="assistant-message" style={styles.assistantBubble}>
-                  {msg.content ? (
-                    isStreaming ? (
-                      <StreamingMessageRenderer text={msg.content} isStreaming={true} />
-                    ) : (
-                      <MarkdownRenderer content={msg.content} />
-                    )
-                  ) : null}
-                  {hasToolsOrThinking && !msg.content && (
-                    <Text style={{ fontSize: 13, color: '#968a7e', fontStyle: 'italic' }}>
-                      🤔 思考中...
-                    </Text>
-                  )}
-                  {msg.thinking ? (
-                    <ThinkingBlock thinking={msg.thinking} />
-                  ) : null}
-                  {msgTools.map((tool: ToolCallInfo, i: number) => (
-                    <ToolCallRow key={`tool-${i}`} tool={tool} />
-                  ))}
-                </View>
-              );
-            } catch (e) {
-              return (
-                <View key={msg.id} style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
-                  <Text style={{ fontSize: 13, color: '#1c1612' }}>{msg.content.slice(0, 500)}</Text>
-                </View>
-              );
-            }
-          })
-        )}
-      </ScrollView>
+        }
+        // 滚动到底部（新消息到来时）
+        onContentSizeChange={() => {
+          if (filteredMessages.length === 0) return;
+          if (!hasScrolledToBottom.current) {
+            setTimeout(() => {
+              flatListRef.current?.scrollToEnd({ animated: false });
+              hasScrolledToBottom.current = true;
+            }, 100);
+          }
+        }}
+        onLayout={() => {
+          if (!hasScrolledToBottom.current && filteredMessages.length > 0) {
+            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 150);
+          }
+        }}
+      />
 
       {/* 输入框 */}
-      <View style={styles.inputBar}>
+      <View style={[styles.inputBar, { backgroundColor: tokens.paperElevated, borderTopColor: tokens.line }]}>
           <TextInput
             style={styles.input}
             placeholder="输入消息..."
@@ -425,7 +421,6 @@ export function ChatScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#faf6ee',
   },
   header: {
     flexDirection: 'row',
@@ -451,8 +446,6 @@ const styles = StyleSheet.create({
   messageListContent: {
     padding: 16,
     paddingBottom: 8,
-    flexGrow: 1,
-    justifyContent: 'flex-end',
   },
   emptyState: {
     flex: 1,
@@ -517,8 +510,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(28, 22, 18, 0.10)',
-    backgroundColor: '#fffcf7',
     minHeight: 56,
   },
   input: {
